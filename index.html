@@ -83,6 +83,14 @@
     </div>
 
     <script src="script.js"></script>
+    <!-- PDF Viewer Modal -->
+<div id="pdfModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; background: #1e293b; color: white; padding: 12px 20px;">
+        <span id="pdfModalTitle" style="font-weight: 700; font-size: 0.95rem;">Reading Chapter</span>
+        <button onclick="closePDFModal()" style="background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; cursor: pointer;">Close ✕</button>
+    </div>
+    <iframe id="pdfIframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+</div>
 </body>
 </html>
 
