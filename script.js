@@ -6,7 +6,7 @@ const booksData = [
         medium: "EN",
         mediumName: "English Medium",
         cover: "images/acc1_en_cover.jpg",
-        driveId: "YOUR_DRIVE_FOLDER_ID_ACC1_EN",
+        driveId: "https://drive.google.com/drive/folders/1fsMvPjrWbUYoPME_VTCX_7lHvmQ00L_L",
         chapters: [
             { num: "CH-1", name: "Introduction to Accounting", pages: "1-18" },
             { num: "CH-2", name: "Theory Base of Accounting", pages: "19-42" },
@@ -24,7 +24,7 @@ const booksData = [
         medium: "HI",
         mediumName: "Hindi Medium",
         cover: "images/acc1_hi_cover.jpg",
-        driveId: "YOUR_DRIVE_FOLDER_ID_ACC1_HI",
+        driveId: "https://drive.google.com/drive/folders/1oNKVPpKY04iF0uGfVFERr_i1a1LS9EbW",
         chapters: [
             { num: "अध्याय-1", name: "लेखांकन - एक परिचय", pages: "1-18" },
             { num: "अध्याय-2", name: "लेखांकन का सैद्धांतिक आधार", pages: "19-42" },
@@ -42,7 +42,7 @@ const booksData = [
         medium: "EN",
         mediumName: "English Medium",
         cover: "images/acc2_en_cover.jpg",
-        driveId: "YOUR_DRIVE_FOLDER_ID_ACC2_EN",
+        driveId: "https://drive.google.com/drive/folders/1o0Mico3hxSxtTVrflZXYo-iw89XLmW4T",
         chapters: [
             { num: "CH-1", name: "Financial Statements - I", pages: "1-35" },
             { num: "CH-2", name: "Financial Statements - II", pages: "36-70" },
