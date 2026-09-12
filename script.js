@@ -429,4 +429,17 @@ function renderMyBooks() {
 function openChapterPDF(bookTitle, chapterNum, chapterIndex) {
     alert(`Opening ${bookTitle} - ${chapterNum}\nFolder-based Google Drive PDF viewer active!`);
               }
+// Register Service Worker for Offline PWA Support
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+                console.log('Service Worker registered successfully with scope: ', reg.scope);
+            })
+            .catch((err) => {
+                console.log('Service Worker registration failed: ', err);
+            });
+    });
+}
+
       
