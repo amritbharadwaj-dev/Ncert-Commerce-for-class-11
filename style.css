@@ -25,7 +25,10 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    padding-bottom: 90px;
+    padding-bottom: 90px;body {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    }
 }
 
 /* Header / Navbar */
@@ -420,6 +423,7 @@ header {
 
 .empty-state h3 {
     font-size: 1.1rem;
+
     font-weight: 700;
     margin-bottom: 6px;
     color: var(--text-main);
@@ -428,4 +432,59 @@ header {
 .empty-state p {
     font-size: 0.85rem;
       }
+/* --- OVERRIDE ALL BLUE/PURPLE TO BLACK & WHITE --- */
+body, html {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+/* Header & Navigation Bar ko Black karein */
+header, .navbar, nav {
+    background: #111111 !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #222222 !important;
+}
+
+/* Banner / Welcome Box (Blue gradient hata kar Black kiya) */
+.banner, .welcome-banner, div[class*="banner"] {
+    background: #161616 !important;
+    color: #ffffff !important;
+    border: 1px solid #333333 !important;
+}
+
+/* Saare Texts ko White ya Gray karein (Blue text hatane ke liye) */
+h1, h2, h3, h4, h5, h6, p, span, a {
+    color: #ffffff !important;
+}
+
+/* Cards Design (Dark Background & White Borders) */
+.card, .book-card {
+    background-color: #121212 !important;
+    border: 1px solid #262626 !important;
+    color: #ffffff !important;
+}
+
+/* Buttons (View Chapters, etc.) */
+button, .btn, .view-btn {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
+    border: none !important;
+}
+
+/* Active Filter Chips (All Mediums, English, Hindi) */
+.chip.active, .filter-btn.active, button.active {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+/* Floating Animation for Book Images */
+img, .book-cover {
+    animation: floatingImage 3s ease-in-out infinite;
+}
+
+@keyframes floatingImage {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
+}
 
