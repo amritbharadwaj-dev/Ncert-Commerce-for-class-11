@@ -425,10 +425,24 @@ function renderMyBooks() {
         grid.appendChild(card);
     });
 }
-
+    if // Har chapter me ab hum direct Google Drive file ka preview link use karenge
 function openChapterPDF(bookTitle, chapterNum, chapterIndex) {
-    if (currentBook && currentBook.driveId && currentBook.driveId ;
-    }
+    // Yahan hum Google Drive ke file ka direct embed/preview link use karenge 
+    // (Jaise hi tu yahan apni PDF ki file ID daalega, yeh seedha app me khul jayega)
+    
+    // Example Drive Preview URL format: https://drive.google.com/file/d/YOUR_FILE_ID/preview
+    const samplePdfUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"; // Demo ke liye sample PDF
+    
+    document.getElementById('pdfModalTitle').innerText = `${bookTitle} - ${chapterNum}`;
+    document.getElementById('pdfIframe').src = samplePdfUrl;
+    document.getElementById('pdfModal').style.display = 'flex';
+}
+
+function closePDFModal() {
+    document.getElementById('pdfModal').style.display = 'none';
+    document.getElementById('pdfIframe').src = ''; // Clear iframe
+}
+    
 }
 // Register Service Worker for Offline PWA Support
 if ('serviceWorker' in navigator) {
