@@ -427,12 +427,7 @@ function renderMyBooks() {
 }
 
 function openChapterPDF(bookTitle, chapterNum, chapterIndex) {
-    if (currentBook && currentBook.driveId && currentBook.driveId !== "YOUR_DRIVE_FOLDER_ID_ACC1_EN") {
-        // Yeh line seedha Google Drive ka folder naye tab me khol degi
-        const driveUrl = `https://drive.google.com/drive/folders/${currentBook.driveId}`;
-        window.open(driveUrl, '_blank');
-    } else {
-        alert(`Bhai! Pehle script.js me '${bookTitle}' ke liye apna Google Drive Folder ID daal.`);
+    if (currentBook && currentBook.driveId && currentBook.driveId ;
     }
 }
 // Register Service Worker for Offline PWA Support
