@@ -8,7 +8,7 @@ const booksData = [
         title: { en: 'Accountancy Part I (Financial Accounting)', hi: 'लेखाशास्त्र भाग १ (वित्तीय लेखांकन)' },
         cover: { en: 'images/acc1_en_cover.jpg', hi: 'images/acc1_hi_cover.jpg' },
         chapters: [
-            { name: { en: 'CH-1: Introduction to Accounting', hi: 'अध्याय-१: लेखांकन का परिचय' }, url_en: 'YAHAN_LINK', url_hi: 'YAHAN_LINK' },
+            { name: { en: 'CH-1: Introduction to Accounting', hi: 'अध्याय-१: लेखांकन का परिचय' }, url_en: 'https://drive.google.com/file/d/1SgxxxE6ckcNR8pm9Km77zGV2x68zSQTj/view?usp=drivesdk', url_hi: 'YAHAN_LINK' },
             { name: { en: 'CH-2: Theory Base of Accounting', hi: 'अध्याय-२: लेखांकन के सैद्धांतिक आधार' }, url_en: 'YAHAN_LINK', url_hi: 'YAHAN_LINK' },
             { name: { en: 'CH-3: Recording of Transactions - I', hi: 'अध्याय-३: लेन-देन का अभिलेखन - १' }, url_en: 'YAHAN_LINK', url_hi: 'YAHAN_LINK' },
             { name: { en: 'CH-4: Recording of Transactions - II', hi: 'अध्याय-४: लेन-देन का अभिलेखन - २' }, url_en: 'YAHAN_LINK', url_hi: 'YAHAN_LINK' },
