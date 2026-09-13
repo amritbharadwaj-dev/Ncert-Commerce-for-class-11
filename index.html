@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSEB Class 11 Commerce</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Top Header -->
+    <header class="app-header">
+        <div class="header-title">
+            <h1 id="welcomeUserTitle">BSEB Class 11 Commerce</h1>
+            <p>English & Hindi Medium Books</p>
+        </div>
+        <div class="header-icon ripple-btn" onclick="openSettings()">⚙️</div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-container">
+        
+        <!-- Auto-Scrolling Banner (Top 5 Books) -->
+        <section class="banner-section">
+            <div class="banner-slider" id="bannerSlider"></div>
+        </section>
+
+        <!-- Medium Filter Tabs -->
+        <div class="filter-tabs">
+            <button class="filter-btn active ripple-btn" onclick="filterBooks('all')">All Mediums</button>
+            <button class="filter-btn ripple-btn" onclick="filterBooks('EN')">English Medium</button>
+            <button class="filter-btn ripple-btn" onclick="filterBooks('HI')">Hindi Medium</button>
+        </div>
+
+        <!-- Books Grid Section (14 Books Total) -->
+        <section class="books-section">
+            <h2>All Textbooks (14 Books)</h2>
+            <div class="books-grid" id="booksGrid"></div>
+        </section>
+
+    </main>
+
+    <!-- Chapter Loading Screen Overlay -->
+    <div id="chapterLoadingScreen" class="loading-overlay" style="display: none;">
+        <div class="loading-box">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Amrit" alt="Avatar">
+            <p>Opening your chapter...</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Telegram Support Avatar -->
+    <div class="floating-avatar ripple-btn" onclick="openChat()">
+        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Amrit" alt="Support">
+        <span class="pulse-ring"></span>
+    </div>
+
+    <!-- Bottom Navigation Bar (No Emojis, Ripple Effect) -->
+    <nav class="bottom-nav">
+        <button class="nav-item active ripple-btn" onclick="switchTab('home')">
+            <p>Home</p>
+        </button>
+        <button class="nav-item ripple-btn" onclick="switchTab('mybooks')">
+            <p>My Books</p>
+        </button>
+    </nav>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
