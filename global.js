@@ -202,7 +202,7 @@ async function sendTelegramMessage() {
 
     if (!text) return;
 
-    const fullMessage = `💬 *New App Message*\n👤 *Identity:* \`${identity}\`\n✉️ *Message:* ${text}`;
+    const fullMessage =`👤 *Identity:* \`${identity}\`\n✉️ *Message:* ${text}`;
 
     appendMessageBubble(`You: ${text}`, 'user', 1000); // 1 second disappear
     msgInput.value = '';
