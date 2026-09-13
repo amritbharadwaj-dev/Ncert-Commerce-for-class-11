@@ -1,0 +1,64 @@
+<!-- Global Floating Avatar & Contact Drawer Widget -->
+<div id="global-widget-root">
+    <!-- Floating Avatar Icon (Draggable / Fixed Floating) -->
+    <div id="floating-avatar-btn" onclick="toggleContactDrawer()" class="fixed bottom-20 right-4 z-50 w-14 h-14 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 p-0.5 shadow-2xl cursor-pointer hover:scale-105 transition-transform duration-300 flex items-center justify-center animate-bounce">
+        <div class="w-full h-full rounded-full bg-white dark:bg-slate-900 overflow-hidden flex items-center justify-center border-2 border-white dark:border-slate-800">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" alt="Avatar" class="w-full h-full object-cover">
+        </div>
+    </div>
+
+    <!-- Contact Us Bottom/Side Drawer Popup -->
+    <div id="contactDrawer" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs hidden flex items-end justify-center transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-5 space-y-4 shadow-2xl border-t border-slate-200 dark:border-slate-800 transform transition-transform duration-300 max-h-[85vh] flex flex-col">
+            
+            <!-- Drawer Header -->
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div class="flex items-center space-x-2">
+                    <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-1.5 rounded-xl">
+                        <i data-lucide="message-square" class="w-4 h-4"></i>
+                    </div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Contact Us</h3>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <!-- Eye Toggle to Show/Hide Telegram Messages -->
+                    <button onclick="toggleTelegramEye()" id="eyeToggleBtn" title="Toggle Live Messages" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition">
+                        <i data-lucide="eye" id="eyeIcon" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="toggleContactDrawer()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Drawer Scrollable Body -->
+            <div class="overflow-y-auto space-y-4 pr-1 flex-grow">
+                
+                <!-- Identity Box (Password Masked Style without Eye icon for max privacy) -->
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+                    <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Your Identity</label>
+                    <div class="relative">
+                        <input type="password" id="userIdentityInput" value="User_8162" oninput="saveUserIdentity(this.value)" class="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-600 font-mono tracking-widest" placeholder="Enter your identity...">
+                    </div>
+                    <p class="text-[10px] text-slate-400">Secured & encrypted. Tap to edit your identity anytime.</p>
+                </div>
+
+                <!-- Live Conversation / Message Box -->
+                <div id="liveMessageBox" class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 min-h-[120px] max-h-[180px] overflow-y-auto flex flex-col justify-end space-y-2">
+                    <div class="text-xs text-slate-400 italic text-center py-6" id="chatPlaceholder">
+                        Send a message to start conversation.
+                    </div>
+                </div>
+
+                <!-- Input Message Bar -->
+                <div class="flex items-center space-x-2 pt-1">
+                    <input type="text" id="messageInput" placeholder="Type message here..." class="flex-grow bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-600 border border-slate-200 dark:border-slate-700">
+                    <button onclick="sendTelegramMessage()" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-xl text-xs font-bold transition shadow-md flex items-center space-x-1">
+                        <span>Send</span>
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
