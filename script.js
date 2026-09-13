@@ -185,7 +185,6 @@ function openChapterByMedium(title, urlEn, urlHi) {
     const selectedUrl = (currentMedium === 'hi') ? urlHi : urlEn;
     openPdfChapter(title, selectedUrl);
 }
-
 function openPdfChapter(title, url) {
     const pdfTitle = document.getElementById('pdf-title');
     if(pdfTitle) pdfTitle.innerText = title;
@@ -199,6 +198,18 @@ function openPdfChapter(title, url) {
     if(iframe) iframe.classList.add('hidden');
     if(bar) bar.style.width = '0%';
 
+    // Google Drive ya other links ke liye safe wrapper
+    let finalUrl = url;
+    if (url && url.includes('drive.google.com')) {
+        if (url.includes('/view')) {
+            finalUrl = url.replace('/view', '/preview');
+        } else if (!url.includes('/preview')) {
+            finalUrl = url + '/preview';
+        }
+    } else if (url && !url.includes('YAHAN_LINK')) {
+        finalUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+    }
+
     let progress = 0;
     const interval = setInterval(() => {
         progress += 25;
@@ -208,13 +219,14 @@ function openPdfChapter(title, url) {
             setTimeout(() => {
                 if(loader) loader.style.display = 'none';
                 if(iframe) {
-                    iframe.src = url;
+                    iframe.src = finalUrl;
                     iframe.classList.remove('hidden');
                 }
             }, 200);
         }
     }, 150);
 }
+
 
 function closePdfViewer() {
     switchView('view-chapters');
