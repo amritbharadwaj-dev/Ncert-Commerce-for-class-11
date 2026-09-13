@@ -1,0 +1,312 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+body {
+    background-color: #ffffff; /* Modern White Background */
+    color: #000000;
+    padding-bottom: 80px;
+}
+
+/* Header */
+.app-header {
+    background: #ffffff;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eeeeee;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-title h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #000000;
+}
+
+.header-title p {
+    font-size: 0.75rem;
+    color: #666666;
+}
+
+.header-icon {
+    font-size: 1.2rem;
+    background: #000000;
+    color: #ffffff;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* Main Container */
+.main-container {
+    padding: 16px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Auto-Scrolling Banner */
+.banner-section {
+    width: 100%;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border-radius: 16px;
+    background: #000000;
+    color: #ffffff;
+    padding: 20px;
+}
+
+.banner-slider {
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+
+.banner-slider::-webkit-scrollbar {
+    display: none;
+}
+
+.banner-card {
+    min-width: 100%;
+    scroll-snap-align: center;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.banner-card img {
+    width: 90px;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #222;
+}
+
+.banner-info h3 {
+    font-size: 1rem;
+    margin-bottom: 6px;
+    color: #ffffff;
+}
+
+.banner-info p {
+    font-size: 0.8rem;
+    color: #bbbbbb;
+}
+
+/* Filter Tabs */
+.filter-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.filter-btn {
+    background: #f4f4f4;
+    border: 1px solid #dddddd;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #333333;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.filter-btn.active {
+    background: #000000;
+    color: #ffffff;
+    border-color: #000000;
+}
+
+/* Books Section */
+.books-section h2 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: #000000;
+}
+
+.books-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.book-card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.book-card img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #f0f0f0;
+}
+
+.book-card h4 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #000000;
+    margin-bottom: 4px;
+}
+
+.book-card p {
+    font-size: 0.7rem;
+    color: #666666;
+    margin-bottom: 10px;
+}
+
+.view-btn {
+    background: #000000;
+    color: #ffffff;
+    border: none;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+}
+
+/* Floating Avatar */
+.floating-avatar {
+    position: fixed;
+    bottom: 85px;
+    right: 20px;
+    width: 55px;
+    height: 55px;
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 999;
+    border: 2px solid #000000;
+    animation: floatAnim 3s ease-in-out infinite;
+}
+
+.floating-avatar img {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+}
+
+@keyframes floatAnim {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+    100% { transform: translateY(0); }
+}
+
+/* Loading Screen Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-box {
+    text-align: center;
+}
+
+.loading-box img {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    border: 2px solid #000;
+}
+
+.loading-box p {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #000;
+}
+
+.progress-bar-container {
+    width: 200px;
+    height: 6px;
+    background: #e0e0e0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.progress-bar-fill {
+    width: 0%;
+    height: 100%;
+    background: #000000;
+    animation: loadProgress 1.2s ease forwards;
+}
+
+@keyframes loadProgress {
+    0% { width: 0%; }
+    100% { width: 100%; }
+}
+
+/* Bottom Navigation (No Emojis) */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #ffffff;
+    border-top: 1px solid #eeeeee;
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+    z-index: 100;
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #666666;
+}
+
+.nav-item.active {
+    color: #000000;
+}
+
+/* Ripple Click Effect */
+.ripple-btn {
+    position: relative;
+    overflow: hidden;
+    transition: opacity 0.2s;
+}
+.ripple-btn:active {
+    opacity: 0.7;
+}
