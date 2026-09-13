@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class 11 Commerce NCERT Reader</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#2563eb', 600: '#1d4ed8' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col">
+
+    <!-- SKELETON LOADER (Initial App Launch Screen) -->
+    <div id="skeleton-screen" class="fixed inset-0 bg-white dark:bg-gray-900 z-50 p-4 flex flex-col space-y-4 overflow-y-auto animate-pulse">
+        <div class="h-10 bg-gray-200 dark:bg-gray-800 rounded-lg w-full mb-2"></div>
+        <div class="h-48 bg-gray-200 dark:bg-gray-800 rounded-2xl w-full"></div>
+        <div class="flex space-x-4 mt-4">
+            <div class="h-10 bg-gray-200 dark:bg-gray-800 rounded-lg w-1/2"></div>
+            <div class="h-10 bg-gray-200 dark:bg-gray-800 rounded-lg w-1/2"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mt-4">
+            <div class="h-40 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+            <div class="h-40 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+            <div class="h-40 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+            <div class="h-40 bg-gray-200 dark:bg-gray-800 rounded-xl"></div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app-container" class="opacity-0 transition-opacity duration-500 flex flex-col flex-grow">
+        
+        <!-- TOP HEADER -->
+        <header class="sticky top-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm z-30 px-4 py-3 flex items-center justify-between">
+            <h1 class="text-lg font-bold flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-blue-600"></i> Commerce 11th NCERT
+            </h1>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleDarkMode()" class="p-2 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- CONTENT AREA (Dynamic Views) -->
+        <main class="flex-grow pb-24">
+            
+            <!-- HOME VIEW -->
+            <div id="view-home" class="view-section px-4 pt-4 space-y-6">
+                <!-- Search Bar -->
+                <div class="relative">
+                    <i class="fa-solid fa-search absolute left-4 top-3.5 text-gray-400"></i>
+                    <input type="text" id="search-input" placeholder="Search by subject or chapter..." class="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <!-- Swipe Carousel (Top 3 Prominent Books) -->
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Featured Books</h2>
+                    <div class="flex overflow-x-auto space-x-4 pb-2 scrollbar-none snap-x">
+                        <div class="min-w-[220px] bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg snap-center flex flex-col justify-between h-36">
+                            <div>
+                                <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full">Top Rated</span>
+                                <h3 class="font-bold text-lg mt-2">Accountancy Part I</h3>
+                            </div>
+                            <button onclick="openBook('acc1', 'en')" class="text-xs bg-white text-blue-600 font-bold py-1.5 px-3 rounded-lg w-max">Read Now</button>
+                        </div>
+                        <div class="min-w-[220px] bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-lg snap-center flex flex-col justify-between h-36">
+                            <div>
+                                <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full">Essential</span>
+                                <h3 class="font-bold text-lg mt-2">Business Studies</h3>
+                            </div>
+                            <button onclick="openBook('bst', 'en')" class="text-xs bg-white text-emerald-600 font-bold py-1.5 px-3 rounded-lg w-max">Read Now</button>
+                        </div>
+                        <div class="min-w-[220px] bg-gradient-to-r from-orange-600 to-amber-700 rounded-2xl p-4 text-white shadow-lg snap-center flex flex-col justify-between h-36">
+                            <div>
+                                <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full">Popular</span>
+                                <h3 class="font-bold text-lg mt-2">Statistics for Economics</h3>
+                            </div>
+                            <button onclick="openBook('eco_stats', 'en')" class="text-xs bg-white text-orange-600 font-bold py-1.5 px-3 rounded-lg w-max">Read Now</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medium Selector Tabs (Hindi / English) -->
+                <div class="flex bg-gray-200 dark:bg-gray-800 p-1 rounded-xl">
+                    <button onclick="setMedium('en')" id="tab-en" class="flex-1 py-2 text-sm font-semibold rounded-lg bg-white dark:bg-gray-700 shadow-sm transition">English Medium</button>
+                    <button onclick="setMedium('hi')" id="tab-hi" class="flex-1 py-2 text-sm font-semibold rounded-lg text-gray-500 dark:text-gray-400 transition">हिन्दी माध्यम</button>
+                </div>
+
+                <!-- Subject Grid List -->
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">All Commerce Books</h2>
+                    <div id="books-grid" class="grid grid-cols-2 gap-4">
+                        <!-- Dynamic Books Injected via JS -->
+                    </div>
+                </div>
+
+                <!-- FOOTER BRANDING -->
+                <div class="text-center py-6 border-t border-gray-200 dark:border-gray-800 mt-8">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Made in ❤️ India &bull; Made for ❤️ India</p>
+                </div>
+            </div>
+
+            <!-- CHAPTER LIST VIEW (Screen 2) -->
+            <div id="view-chapters" class="view-section hidden px-4 pt-4 space-y-4">
+                <button onclick="goHome()" class="flex items-center gap-2 text-blue-600 font-semibold mb-2">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Explore
+                </button>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm flex flex-col items-center text-center">
+                    <img id="detail-cover" src="" alt="Book Cover" class="w-32 h-44 object-cover rounded-xl shadow-md mb-3">
+                    <h2 id="detail-title" class="font-bold text-lg">Book Title</h2>
+                    <p id="detail-meta" class="text-xs text-gray-500 dark:text-gray-400 mb-4">NCERT Publication</p>
+                    <button id="bookmark-btn" onclick="toggleBookmark()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-bookmark"></i> Add to My Books
+                    </button>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">Chapters List</h3>
+                    <div id="chapters-list" class="space-y-2">
+                        <!-- Dynamic Chapters List -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- MY BOOKS VIEW -->
+            <div id="view-mybooks" class="view-section hidden px-4 pt-4 space-y-4">
+                <h2 class="text-xl font-bold">My Saved Books</h2>
+                <div id="mybooks-grid" class="grid grid-cols-2 gap-4">
+                    <!-- Saved Books injected here -->
+                </div>
+            </div>
+
+            <!-- PDF VIEWER & HIGHLIGHTER SCREEN (Screen 3) -->
+            <div id="view-pdf" class="view-section hidden flex flex-col h-[85vh]">
+                <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <button onclick="closePdfViewer()" class="text-blue-600 font-semibold"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                    <h3 id="pdf-title" class="font-bold text-sm truncate max-w-[200px]">Chapter PDF</h3>
+                    <div class="flex gap-2">
+                        <button onclick="highlightText('yellow')" class="w-5 h-5 rounded-full bg-yellow-300 border"></button>
+                        <button onclick="highlightText('green')" class="w-5 h-5 rounded-full bg-green-300 border"></button>
+                        <button onclick="highlightText('pink')" class="w-5 h-5 rounded-full bg-pink-300 border"></button>
+                    </div>
+                </div>
+                <!-- Loading Screen / Avatar Mock -->
+                <div id="pdf-loader" class="flex flex-col items-center justify-center flex-grow p-6">
+                    <img src="images/acc1_en_cover.jpg" class="w-20 h-20 rounded-full animate-bounce shadow-md object-cover mb-4" alt="Avatar">
+                    <p class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2">Opening your chapter...</p>
+                    <div class="w-48 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-blue-600 w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+                <!-- PDF iframe frame -->
+                <iframe id="pdf-frame" src="" class="w-full flex-grow hidden border-0"></iframe>
+            </div>
+
+        </main>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <nav class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 py-2 px-6 flex justify-around items-center z-40 shadow-lg">
+            <button onclick="switchTab('home')" id="nav-home" class="flex flex-col items-center text-blue-600">
+                <i class="fa-solid fa-house text-lg"></i>
+                <span class="text-xs mt-1">Explore</span>
+            </button>
+            <button onclick="switchTab('mybooks')" id="nav-mybooks" class="flex flex-col items-center text-gray-400 hover:text-blue-600">
+                <i class="fa-solid fa-bookmark text-lg"></i>
+                <span class="text-xs mt-1">My Books</span>
+            </button>
+        </nav>
+
+        <!-- PLACEHOLDER FOR GLOBAL FLOATING ICON & SETTINGS (Future Integration) -->
+        <!-- Yahan aap baad me global.html aur setting.html attach kar sakoge -->
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
