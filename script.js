@@ -6,7 +6,7 @@ const booksData = [
         medium: 'English Medium',
         cover: 'images/acc1_en_cover.jpg',
         chapters: [
-            { name: 'Ch 1: Introduction to Accounting', url:https: 'https://drive.google.com/file/d/1SgxxxE6ckcNR8pm9Km77zGV2x68zSQTj/preview' },
+            { name: 'Ch 1: Introduction to Accounting', url:' },
             { name: 'Ch 2: Theory Base of Accounting', url: '' },
             { name: 'Ch 3: Recording of Transactions - I', url: '' },
             { name: 'Ch 4: Recording of Transactions - II', url: '' },
