@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html lang="hi" class="light">
 <head>
+        <script>
+        (function() {
+            const savedMode = localStorage.getItem('app_theme_mode') || 'light';
+            const htmlEl = document.documentElement;
+            if (savedMode === 'dark') {
+                htmlEl.classList.add('dark');
+                htmlEl.classList.remove('light');
+            } else if (savedMode === 'light') {
+                htmlEl.classList.remove('dark');
+                htmlEl.classList.add('light');
+            } else if (savedMode === 'auto') {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    htmlEl.classList.add('dark');
+                    htmlEl.classList.remove('light');
+                } else {
+                    htmlEl.classList.remove('dark');
+                    htmlEl.classList.add('light');
+                }
+            }
+        })();
+        </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NCERT Commerce Hub</title>
