@@ -195,7 +195,7 @@ function openChapterByMedium(title, urlEn, urlHi) {
     openPdfChapter(title, selectedUrl);
 }
 
-function openPdfChapter(title, url) {
+ function openPdfChapter(title, url) {
     const pdfTitle = document.getElementById('pdf-title');
     if(pdfTitle) pdfTitle.innerText = title;
     switchView('view-pdf');
@@ -208,20 +208,12 @@ function openPdfChapter(title, url) {
     if(iframe) iframe.classList.add('hidden');
     if(bar) bar.style.width = '0%';
 
+    // Firebase direct links iframe me bina kisi error ke chalte hain!
     let finalUrl = url;
-    if (url.includes('drive.google.com')) {
-        if (url.includes('/view')) {
-            finalUrl = url.replace('/view', '/preview');
-        } else if (!url.includes('/preview')) {
-            finalUrl = url + '/preview';
-        }
-    } else {
-        finalUrl = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-    }
 
     let progress = 0;
     const interval = setInterval(() => {
-        progress += 30;
+        progress += 35;
         if(bar) bar.style.width = progress + '%';
         if(progress >= 100) {
             clearInterval(interval);
@@ -235,6 +227,7 @@ function openPdfChapter(title, url) {
         }
     }, 100);
 }
+
 
 function closePdfViewer() {
     switchView('view-chapters');
