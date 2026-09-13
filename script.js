@@ -8,7 +8,7 @@ const booksData = [
         title: { en: 'Accountancy Part I (Financial Accounting)', hi: 'लेखाशास्त्र भाग १ (वित्तीय लेखांकन)' },
         cover: { en: 'images/acc1_en_cover.jpg', hi: 'images/acc1_hi_cover.jpg' },
         chapters: [
-            { name: { en: 'CH-1: Introduction to Accounting', hi: 'अध्याय-१: लेखांकन का परिचय' }, url_en: 'https://drive.google.com/file/d/1SgxxxE6ckcNR8pm9Km77zGV2x68zSQTj/view?usp=drivesdk', url_hi: 'https://drive.google.com/file/d/1OGG8G8pibJtBdmeDAQOLcwFeM0IsBm4k/view?usp=drivesdk' },
+            { name: { en: 'CH-1: Introduction to Accounting', hi: 'अध्याय-१: लेखांकन का परिचय' }, url_en: 'https://drive.google.com/file/d/1SgxxxE6ckcNR8pm9Km77zGV2x68zSQTj/view?usp=drivesdk/preview', url_hi: 'https://drive.google.com/file/d/1OGG8G8pibJtBdmeDAQOLcwFeM0IsBm4k/view?usp=drivesdk/preview' },
             { name: { en: 'CH-2: Theory Base of Accounting', hi: 'अध्याय-२: लेखांकन के सैद्धांतिक आधार' }, url_en: 'YAHAN_ENGLISH_LINK', url_hi: 'YAHAN_HINDI_LINK' },
             { name: { en: 'CH-3: Recording of Transactions - I', hi: 'अध्याय-३: लेन-देन का अभिलेखन - १' }, url_en: 'YAHAN_ENGLISH_LINK', url_hi: 'YAHAN_HINDI_LINK' },
             { name: { en: 'CH-4: Recording of Transactions - II', hi: 'अध्याय-४: लेन-देन का अभिलेखन - २' }, url_en: 'YAHAN_ENGLISH_LINK', url_hi: 'YAHAN_HINDI_LINK' },
@@ -192,10 +192,7 @@ function openChapterByMedium(title, urlEn, urlHi) {
         return;
     }
     
-    openPdfChapter(title, selectedUrl);
-}
-
- function openPdfChapter(title, url) {
+function openPdfChapter(title, url) {
     const pdfTitle = document.getElementById('pdf-title');
     if(pdfTitle) pdfTitle.innerText = title;
     switchView('view-pdf');
@@ -208,9 +205,6 @@ function openChapterByMedium(title, urlEn, urlHi) {
     if(iframe) iframe.classList.add('hidden');
     if(bar) bar.style.width = '0%';
 
-    // Firebase direct links iframe me bina kisi error ke chalte hain!
-    let finalUrl = url;
-
     let progress = 0;
     const interval = setInterval(() => {
         progress += 35;
@@ -220,15 +214,14 @@ function openChapterByMedium(title, urlEn, urlHi) {
             setTimeout(() => {
                 if(loader) loader.style.display = 'none';
                 if(iframe) {
-                    iframe.src = finalUrl;
+                    iframe.src = url; // Seedha /preview wala link yahan load ho jayega!
                     iframe.classList.remove('hidden');
                 }
             }, 200);
         }
     }, 100);
 }
-
-
+}
 function closePdfViewer() {
     switchView('view-chapters');
 }
