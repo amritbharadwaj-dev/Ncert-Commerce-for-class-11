@@ -1,6 +1,6 @@
 // Global Widget & Telegram Integration Logic - Enlarged Draggable Avatar (Double Size)
 
-const TG_BOT_TOKEN = "8505475770:AAE3jxOUMOAhDWwRBs_pR6uEBZ4cgPyuwNU";
+const TG_BOT_TOKEN = "8619738096:AAFcVqqGP4zkoTkV9zd9fsBinJOsVsGkAyA";
 const TG_CHAT_ID = "8871892242";
 
 let showLiveMessages = true;
