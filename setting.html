@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="hi" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Commerce Hub</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
+
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-xs">
+        <div class="flex items-center space-x-3">
+            <a href="index.html" class="ripple-btn bg-slate-100 dark:bg-slate-800 p-2 rounded-xl text-slate-800 dark:text-slate-200">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </a>
+            <h1 class="font-extrabold text-base tracking-wide">App Settings</h1>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-lg mx-auto w-full px-4 py-6 space-y-6 pb-20">
+        
+        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+            <div class="flex items-center space-x-2.5">
+                <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
+                    <i data-lucide="moon" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">App Theme</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Choose your preferred viewing mode</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-2 pt-2">
+                <button onclick="setTheme('light')" id="btn-light" class="ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition shadow-xs flex items-center justify-center space-x-1.5">
+                    <i data-lucide="sun" class="w-3.5 h-3.5"></i>
+                    <span>Light</span>
+                </button>
+                <button onclick="setTheme('dark')" id="btn-dark" class="ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition shadow-xs flex items-center justify-center space-x-1.5">
+                    <i data-lucide="moon" class="w-3.5 h-3.5"></i>
+                    <span>Dark</span>
+                </button>
+                <button onclick="setTheme('auto')" id="btn-auto" class="ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition shadow-xs flex items-center justify-center space-x-1.5">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                    <span>Auto</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+            <div class="flex items-center space-x-2.5">
+                <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">About Us</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Our mission and vision for commerce students</p>
+                </div>
+            </div>
+            <div class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed space-y-2.5 font-normal pt-1">
+                <p>Welcome to <strong>Commerce Hub 11</strong>, the premier digital destination meticulously engineered to revolutionize how Class 11 commerce students access, interact with, and master their academic curriculum. In today’s fast-paced educational environment, traditional heavy textbooks and scattered digital PDFs often create friction in seamless learning. Our platform bridges this gap by offering an ultra-fast, modern, elegant, and distraction-free digital ecosystem right in the palm of your hand.</p>
+                <p>Founded with a passionate vision to democratize quality education across every nook and corner of India, Commerce Hub integrates official NCERT study materials, accounting principles, business studies frameworks, economic development insights, and mathematical problem-solving assets into a unified, high-performance Progressive Web Application (PWA). We believe that financial literacy, analytical accounting, and strategic business acumen are the foundational pillars of India's future economic growth. Therefore, every single chapter, formula, practice set, and answer key is curated to provide absolute clarity and depth.</p>
+                <p>Our engineering team prioritizes speed, minimalism, and reliability. By utilizing modern web caching protocols and local storage synchronization, the application operates with near-zero latency, ensuring that students can open chapters instantly even under unstable network connections. The crisp white and deep dark interface modes have been meticulously crafted following modern typographic and aesthetic principles to prevent eye strain during long study hours. As we continue to expand our library and refine our tools, our commitment remains unwavering: empowering the next generation of commerce leaders, entrepreneurs, chartered accountants, and economists with world-class digital learning resources, completely free of charge and fully optimized for mobile-first education.</p>
+            </div>
+        </section>
+
+        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+            <div class="flex items-center space-x-2.5">
+                <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Privacy Policy & Safety</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Your data safety is our highest priority</p>
+                </div>
+            </div>
+            <div class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed space-y-2.5 font-normal pt-1">
+                <p>At <strong>Commerce Hub 11</strong>, we hold your personal privacy and data security with the utmost seriousness. We operate under a strict <strong>zero-data-collection</strong> policy. Unlike conventional applications that track your personal details, monitor browsing habits, or harvest sensitive credentials, our platform collects absolutely no personal data from its users.</p>
+                <p>All your saved bookmarks, preferences, and reading states are securely stored exclusively within your device's local memory (LocalStorage). No personal information, phone numbers, email addresses, or usage logs are ever transmitted to external servers or third-party entities. You can navigate through chapters, read educational papers, and manage your saved books in a completely safe, secure, and private digital environment. Your education is your personal journey, and we ensure it remains entirely confidential and protected.</p>
+            </div>
+        </section>
+
+        <div class="text-center pt-4 pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <p>Made in ❤️ India • Made for ❤️ India</p>
+        </div>
+    </main>
+
+    <script src="global.js"></script>
+    <script src="setting.js"></script>
+</body>
+</html>
