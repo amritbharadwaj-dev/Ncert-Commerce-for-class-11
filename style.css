@@ -1,0 +1,97 @@
+/* ==========================================
+   COMMERCE 11TH NCERT READER - CUSTOM CSS
+   ========================================== */
+
+/* Base Transitions for Dark/Light Mode */
+body, div, header, nav, input, button {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Hide scrollbar for Chrome, Safari, and Opera */
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge, and Firefox */
+.scrollbar-none {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Custom Card Shadows */
+.card-shadow {
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dark .card-shadow {
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* 5-Color Text Highlighter Styles (For Reader Feature) */
+.highlight-yellow {
+    background-color: #fef08a !important; /* Yellow-200 */
+    color: #1e293b !important;
+}
+.dark .highlight-yellow {
+    background-color: #854d0e !important;
+    color: #fef9c3 !important;
+}
+
+.highlight-green {
+    background-color: #bbf7d0 !important; /* Green-200 */
+    color: #1e293b !important;
+}
+.dark .highlight-green {
+    background-color: #166534 !important;
+    color: #dcfce7 !important;
+}
+
+.highlight-pink {
+    background-color: #fbcfe8 !important; /* Pink-200 */
+    color: #1e293b !important;
+}
+.dark .highlight-pink {
+    background-color: #9d174d !important;
+    color: #fce7f3 !important;
+}
+
+.highlight-blue {
+    background-color: #bfdbfe !important; /* Blue-200 */
+    color: #1e293b !important;
+}
+.dark .highlight-blue {
+    background-color: #1e40af !important;
+    color: #dbeafe !important;
+}
+
+.highlight-orange {
+    background-color: #fed7aa !important; /* Orange-200 */
+    color: #1e293b !important;
+}
+.dark .highlight-orange {
+    background-color: #9a3412 !important;
+    color: #ffedd5 !important;
+}
+
+/* Glassmorphism Effect for Headers & Nav */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass-effect {
+    background: rgba(17, 24, 39, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* Skeleton Pulse Customization */
+@keyframes pulse-custom {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.animate-pulse-fast {
+    animation: pulse-custom 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
