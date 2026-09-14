@@ -6,12 +6,12 @@ const booksData = [
         cover: 'images/acc1_en_cover.jpg',
         chapters: [
             { name: 'Ch 1: Introduction to Accounting', url: 'https://drive.google.com/file/d/1SgxxxE6ckcNR8pm9Km77zGV2x68zSQTj/preview' },
-            { name: 'Ch 2: Theory Base of Accounting', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 3: Recording of Transactions - I', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 4: Recording of Transactions - II', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 5: Bank Reconciliation Statement', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 6: Trial Balance and Rectification of Errors', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 7: Depreciation, Provisions and Reserves', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
+            { name: 'Ch 2: Theory Base of Accounting', url: 'https://drive.google.com/file/d/1YN2s4XSGQpKnpUmNNHdMhrZNlY9YeO0U/preview' },
+            { name: 'Ch 3: Recording of Transactions - I', url: 'https://drive.google.com/file/d/1ARX1zGG9jXSUC0F0-TqgE1ZHEXznZcS-/preview' },
+            { name: 'Ch 4: Recording of Transactions - II', url: 'https://drive.google.com/file/d/1PSCcnlejwTHsuOhdp3ryNJEgKcpJjRm5/preview' },
+            { name: 'Ch 5: Bank Reconciliation Statement', url: 'https://drive.google.com/file/d/1eYpMbXWyAS4CSyoWjaZdMcGaepfPwSf6/preview' },
+            { name: 'Ch 6: Trial Balance and Rectification of Errors', url: 'https://drive.google.com/file/d/1GadhbO6iPqKOo0j37ivRilNyCG9SZ4dn/preview' },
+            { name: 'Ch 7: Depreciation, Provisions and Reserves', url: 'https://drive.google.com/file/d/1Nt1cy3mTHXB7Y8eLbER-u6G9puj836bz/preview' },
             { name: 'Ch 8: Bill of Exchange', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
         ]
     },
