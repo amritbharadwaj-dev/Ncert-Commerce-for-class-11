@@ -125,14 +125,14 @@ const booksData = [
         medium: 'English Medium',
         cover: 'images/eco_stats_en_cover.jpg',
         chapters: [
-            { name: 'Ch 1: Introduction to Statistics', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 2: Collection of Data', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 3: Organisation of Data', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 4: Presentation of Data', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 5: Measures of Central Tendency', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 6: Measures of Dispersion', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 7: Correlation', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 8: Index Numbers', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'Ch 1: Introduction to Statistics', url: 'https://drive.google.com/file/d/1VLB3NMqkVitkIHfL879Cuq0cnVL2VgD8/preview' },
+            { name: 'Ch 2: Collection of Data', url: 'https://drive.google.com/file/d/1zS2tU1N4Dhr1ETNSWtYiP7zueWWwixmm/preview' },
+            { name: 'Ch 3: Organisation of Data', url: 'https://drive.google.com/file/d/1_I4PQhzyAdxrINvVFqBjcXR36ERNE_XS/preview' },
+            { name: 'Ch 4: Presentation of Data', url: 'https://drive.google.com/file/d/1HQlNmCxJR-pLOxoCaH5b3a30n6a1xVhF/preview' },
+            { name: 'Ch 5: Measures of Central Tendency', url: 'https://drive.google.com/file/d/1ddNJAaBp0UIZprK3yE_lrmDotX4xqKB1/preview' },
+            { name: 'Ch 6: Correlation', url: 'https://drive.google.com/file/d/1nwfHRtIHWu6Eg9pr_z41FqXN1R-fDY3O/preview' },
+            { name: 'Ch 7: Index Numbers', url: 'https://drive.google.com/file/d/1mjCLO7xDOTu-GVy-DWZidvKva4uZvDKS/preview' },
+            { name: 'Ch 8: Use of Statistical Tools', url: 'https://drive.google.com/file/d/11Qfrp2SEkHSWJNlPUlHSmrsjviYSKntQ/preview' }
         ]
     },
     {
@@ -141,14 +141,14 @@ const booksData = [
         medium: 'Hindi Medium',
         cover: 'images/eco_stats_hi_cover.jpg',
         chapters: [
-            { name: 'अध्याय 1: सांख्यिकी परिचय', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 2: आंकड़ों का संकलन', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 3: आंकड़ों का संगठन', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 4: आंकड़ों का प्रस्तुतिकरण', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 5: केंद्रीय प्रवृत्ति की माप', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 6: अपकिरण के माप', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 7: सहसंबंध', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 8: सूचकांक', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'अध्याय 1: सांख्यिकी परिचय', url: 'https://drive.google.com/file/d/1Oz7G37_6dwqNPYtku4BhFfujKwKRO2EL/preview' },
+            { name: 'अध्याय 2: आंकड़ों का संकलन', url: 'https://drive.google.com/file/d/1Mp193EHwT5W8gSbl1-kti5HaxEZSMmZ1/preview' },
+            { name: 'अध्याय 3: आंकड़ों का संगठन', url: 'https://drive.google.com/file/d/1sKVp-TuGU84dr_ZkV6RRjb1-x5yLq_DI/preview' },
+            { name: 'अध्याय 4: आंकड़ों का प्रस्तुतिकरण', url: 'https://drive.google.com/file/d/1PJiH-HE4LylT4YRNXGA5w_UMGTrTxBaN/preview' },
+            { name: 'अध्याय 5: केंद्रीय प्रवृत्ति की माप', url: 'https://drive.google.com/file/d/1RHKMfOmawRlGE-uU8BGTsInfpEs_vCBu/preview' },
+            { name: 'अध्याय 6: सहसंबंध', url: 'https://drive.google.com/file/d/1PsUCV9q3ExzWmlCKBzp-5XYzxeX_88ch/preview' },
+            { name: 'अध्याय 7: सूचकांक', url: 'https://drive.google.com/file/d/13SxfutPuEay7bgy5y7SLoQ562vJIvLR0/preview' },
+            { name: 'अध्याय 8: सांख्यिकीय विधियों का प्रयोग'', url: 'https://drive.google.com/file/d/1Qki7a0pcy4WUVbF1XXU_XqUBrNv4eVI_/preview' }
         ]
     },
     {
