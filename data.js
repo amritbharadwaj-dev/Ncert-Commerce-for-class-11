@@ -74,17 +74,17 @@ const booksData = [
         medium: 'Hindi Medium',
         cover: 'images/bst_hi_cover.jpg',
         chapters: [
-            { name: 'अध्याय 1: व्यवसाय की प्रकृति एवं उद्देश्य', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 2: व्यावसायिक संगठन के स्वरूप', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 3: निजी, सार्वजनिक एवं भूमंडलीय उपक्रम', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 4: व्यावसायिक सेवाएँ', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 5: व्यवसाय के उभरते हुए तरीके', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 6: व्यवसाय की सामाजिक उत्तरदायित्व', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 7: व्यवसाय के लिए वित्त के स्रोत', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 8: लघु व्यवसाय', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 9: आंतरिक व्यापार', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 10: अंतर्राष्ट्रीय व्यापार - I', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 11: अंतर्राष्ट्रीय व्यापार - II', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'अध्याय 1: व्यवसाय, व्यापार और वाणिज्य', url: 'https://drive.google.com/file/d/1fs-LELviF-0nH6XbCrMeMXPpcu4pOQzR/preview' },
+            { name: 'अध्याय 2: व्यावसायिक संगठन के स्वरूप', url: 'https://drive.google.com/file/d/1dkonpY5GR3tUJ1yZBZ1PPv3C0bHEOeSP/preview' },
+            { name: 'अध्याय 3: निजी, सार्वजनिक एवं भूमंडलीय उपक्रम', url: 'https://drive.google.com/file/d/1pTFxrgR9d3ecZFtz2eo8KHgQPMFxEQbY/preview' },
+            { name: 'अध्याय 4: व्यावसायिक सेवाएँ', url: 'https://drive.google.com/file/d/1zOPTvnmatI1xKhEmwNYKp0voZY-SMa-I/preview' },
+            { name: 'अध्याय 5: व्यवसाय के उभरते हुए तरीके', url: 'https://drive.google.com/file/d/1f6nRxL00ELpLOOHuaEGN1ztZl4Sh0Zy3/preview' },
+            { name: 'अध्याय 6: व्यवसाय की सामाजिक उत्तरदायित्व तथा व्यावसायिक नैतिकता', url: 'https://drive.google.com/file/d/1qpJYi1qjA4RLM1KywzobHIdQVPJsZgnD/preview' },
+            { name: 'अध्याय 7: कंपनी की स्थापना', url: 'https://drive.google.com/file/d/1xcxeEA6Eq1nxR39lXOj5Xynj8RC56Mj9/preview' },
+            { name: 'अध्याय 8: व्यवसाय के वित्त के स्रोत', url: 'https://drive.google.com/file/d/1anmPfR5YLJXM1Xx3X2gSo0bQUQvD-e6l/preview' },
+            { name: 'अध्याय 9: सूक्ष्म, लघु एवं मध्यम उद्यम और व्यवसाय उद्यमिता', url: 'https://drive.google.com/file/d/1njkMJ8MTt8m8zruvQSwQDd8z35VHzapG/preview' },
+            { name: 'अध्याय 10: आंतरिक व्यापार', url: 'https://drive.google.com/file/d/1qmDX_Zc_OiF6A6jKIc8kxUNvr-GLfsdL/preview' },
+            { name: 'अध्याय 11: अंतर्राष्ट्रीय व्यापार ', url: 'https://drive.google.com/file/d/1jacVrI_BjMVE6ZgoEfyaKYHub451kCNL/preview' }
         ]
     },
     {
