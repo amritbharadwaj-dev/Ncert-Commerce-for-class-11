@@ -27,7 +27,6 @@ const booksData = [
             { name: 'अध्याय 5: बैंक समाधान विवरण', url: 'https://drive.google.com/file/d/1LrqWTiSuEeYunWT0BrWSXbioWnb5xyLQ/preview' },
             { name: 'अध्याय 6: तलपट एवं अशुद्धियों का सुधार', url: 'https://drive.google.com/file/d/13YS5xwf_hZkgTrdPFDD0RbPRydydPB7B/preview' },
             { name: 'अध्याय 7: ह्रास, प्रावधान तथा संचय', url: 'https://drive.google.com/file/d/1gg3h4iq8OtNP-6bLUmxnnN0SDfhElQR6/preview' },
-            { name: 'अध्याय 8: विनिमय विपपत्र', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
         ]
     },
     {
@@ -36,8 +35,8 @@ const booksData = [
         medium: 'English Medium',
         cover: 'images/acc2_en_cover.jpg',
         chapters: [
-            { name: 'Ch 1: Financial Statements - I', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 2: Financial Statements - II', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'Ch 1: Financial Statements - I', url: 'https://drive.google.com/file/d/15RCKACWESrxyeQ1TZdclPkOB34mcEGoR/preview' },
+            { name: 'Ch 2: Financial Statements - II', url: 'https://drive.google.com/file/d/1lP0eo1Js1W32qscrMJxMgi0udGnl2H7c/preview' }
         ]
     },
     {
@@ -46,8 +45,8 @@ const booksData = [
         medium: 'Hindi Medium',
         cover: 'images/acc2_hi_cover.jpg',
         chapters: [
-            { name: 'अध्याय 1: वित्तीय विवरण - I', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 2: वित्तीय विवरण - II', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'अध्याय 1: वित्तीय विवरण - I', url: 'https://drive.google.com/file/d/1EzIMEHNJkbeLcV4oCFMDW-CPTNu026jk/preview' },
+            { name: 'अध्याय 2: वित्तीय विवरण - II', url: 'https://drive.google.com/file/d/11zgIVL35RLtaa_q961GsU55p1kaQ_M3Z/preview' }
         ]
     },
     {
