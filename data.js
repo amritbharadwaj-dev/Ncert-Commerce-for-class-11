@@ -93,14 +93,14 @@ const booksData = [
         medium: 'English Medium',
         cover: 'images/eco_ied_en_cover.jpg',
         chapters: [
-            { name: 'Ch 1: Indian Economy on the Eve of Independence', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 2: Indian Economy 1950-1990', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 3: Liberalisation, Privatisation and Globalisation', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 4: Human Capital Formation in India', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 5: Rural Development', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 6: Employment & Growth', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 7: Environment and Sustainable Development', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'Ch 8: Comparative Development Experiences', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'Ch 1: Indian Economy on the Eve of Independence', url: 'https://drive.google.com/file/d/1B0v1ae_QAJ_HPhKSzV1nseFHQ_xNqDbv/preview' },
+            { name: 'Ch 2: Indian Economy 1950-1990', url: 'https://drive.google.com/file/d/1BaUS45Hz9Fs6RHzwnCfkBCcK9wc1ACKn/preview' },
+            { name: 'Ch 3: Liberalisation, Privatisation and Globalisation', url: 'https://drive.google.com/file/d/1WU1WIFFDjULW1nArHBxdVNOZdy-30o2q/preview' },
+            { name: 'Ch 4: Human Capital Formation in India', url: 'https://drive.google.com/file/d/1wRKXj_SXNp4rFTn2LSTHdFTOqy-AH-iT/preview' },
+            { name: 'Ch 5: Rural Development', url: 'https://drive.google.com/file/d/16AMSzc30of1apii6oqRy5euHKoJIOp9j/preview' },
+            { name: 'Ch 6: Employment :Growth,Information and other Issues', url: 'https://drive.google.com/file/d/1ZQH8njz6Q4VTJGLcKiBers3tAxYL88cc/preview' },
+            { name: 'Ch 7: Environment and Sustainable Development', url: 'https://drive.google.com/file/d/1W1o7J5EEV8szF9xEKX1VTRaIyPGiVmzH/preview' },
+            { name: 'Ch 8: Comparative Development Experiences of India and its Neighbours', url: 'https://drive.google.com/file/d/1D_mfDTCQPTGVadcMXNLOSPsmzMiR7vkm/preview' }
         ]
     },
     {
@@ -109,14 +109,14 @@ const booksData = [
         medium: 'Hindi Medium',
         cover: 'images/eco_ied_hi_cover.jpg',
         chapters: [
-            { name: 'अध्याय 1: स्वतंत्रता की पूर्व संध्या पर भारतीय अर्थव्यवस्था', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 2: भारतीय अर्थव्यवस्था 1950-1990', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 3: उदारीकरण, निजीकरण और वैश्वीकरण', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 4: भारत में मानव पूंजी निर्माण', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 5: ग्रामीण विकास', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 6: रोजगार एवं वृद्धि', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 7: पर्यावरण और सतत विकास', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 8: भारत और पड़ोसी देशों के तुलनात्मक विकास अनुभव', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
+            { name: 'अध्याय 1: स्वतंत्रता की पूर्व संध्या पर भारतीय अर्थव्यवस्था', url: 'https://drive.google.com/file/d/1JU1fwZOxkTuiWgdANTFdbmHfVb_YImZX/preview' },
+            { name: 'अध्याय 2: भारतीय अर्थव्यवस्था 1950-1990', url: 'https://drive.google.com/file/d/1AW3ZXLpeRrfJfItdvpWwkV_ebmsGUDwI/preview' },
+            { name: 'अध्याय 3: उदारीकरण, निजीकरण और वैश्वीकरण', url: 'https://drive.google.com/file/d/1Fzzk5BUfnPaSGBcaTNYczIdhxpcEgmH2/preview' },
+            { name: 'अध्याय 4: भारत में मानव पूंजी निर्माण', url: 'https://drive.google.com/file/d/1Vd8UpCAGPtxW19FM4WlUl97smAOWzhj2/preview' },
+            { name: 'अध्याय 5: ग्रामीण विकास', url: 'https://drive.google.com/file/d/1JuQYVmD46JF8lQcp-f3-DW84pknOBmLH/preview' },
+            { name: 'अध्याय 6: रोजगार - संवृद्धि, अनौपचारीकरण एवं अन्य मुद्दे', url: 'https://drive.google.com/file/d/1hnto20CkN9wm3SyDcXvM5k4qmuYqEbfF/preview' },
+            { name: 'अध्याय 7: पर्यावरण और धारणीय विकास', url: 'https://drive.google.com/file/d/1rYHzvahCcqM5sUYd7m4EB8by6r0QhlEy/preview' },
+            { name: 'अध्याय 8: भारत और पड़ोसी देशों के तुलनात्मक विकास अनुभव', url: 'https://drive.google.com/file/d/1hb47m3sZ4akJoenbU5QtjjNWDIDxxbzQ/preview' }
         ]
     },
     {
