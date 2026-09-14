@@ -269,3 +269,42 @@ async function startTelegramPolling() {
         } catch (err) {}
     }, 4000);
           }
+// --- Support Toggle & Avatar Visibility System ---
+document.addEventListener('DOMContentLoaded', () => {
+    initSupportState();
+});
+
+function toggleGlobalSupport() {
+    let isActive = localStorage.getItem('global_support_active') === 'true';
+    isActive = !isActive; // State flip karo (true se false, false se true)
+    localStorage.setItem('global_support_active', isActive);
+    updateSupportUI(isActive);
+}
+
+function initSupportState() {
+    // Agar pehle se kuch saved nahi hai, toh default 'false' (OFF) rakho
+    if (localStorage.getItem('global_support_active') === null) {
+        localStorage.setItem('global_support_active', 'false');
+    }
+    const isActive = localStorage.getItem('global_support_active') === 'true';
+    updateSupportUI(isActive);
+}
+
+function updateSupportUI(isActive) {
+    const avatar = document.getElementById('floating-avatar-btn');
+    const toggleInput = document.getElementById('supportToggleInput');
+
+    if (avatar) {
+        // Agar active true hai toh dikhao, false hai toh hide kar do
+        avatar.style.display = isActive ? 'flex' : 'none';
+        if (!isActive) {
+            const drawer = document.getElementById('contactDrawer');
+            if (drawer) drawer.classList.add('hidden');
+        }
+    }
+
+    if (toggleInput) {
+        toggleInput.checked = isActive;
+    }
+}
+
