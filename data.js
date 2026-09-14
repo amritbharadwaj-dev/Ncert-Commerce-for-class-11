@@ -55,17 +55,17 @@ const booksData = [
         medium: 'English Medium',
         cover: 'images/bst_en_cover.jpg',
         chapters: [
-            { name: 'Ch 1: Nature and Purpose of Business', url: 'https://drive.google.com/file/d/1OaAt4nhtHXWpBKV-igRvMdzSMP9wIKiR/preview' },
+            { name: 'Ch 1: Business, Trade and Commerce', url: 'https://drive.google.com/file/d/1OaAt4nhtHXWpBKV-igRvMdzSMP9wIKiR/preview' },
             { name: 'Ch 2: Forms of Business Organisation', url: 'https://drive.google.com/file/d/1b2g0by3PaPtCWZ6cqRAB0mVtUfrfU030/preview' },
             { name: 'Ch 3: Private, Public and Global Enterprises', url: 'https://drive.google.com/file/d/1rqGr6HV_IQlsvRY7qP4k7BmYiSzJubZd/preview' },
             { name: 'Ch 4: Business Services', url: 'https://drive.google.com/file/d/1Qu1kTWts7YpYGhMBgkVG9_F9o5FlVBg_/preview' },
             { name: 'Ch 5: Emerging Modes of Business', url: 'https://drive.google.com/file/d/1UPNGuMi1V9jTqboJDX31U5wzDG4eMYZl/preview' },
-            { name: 'Ch 6: Social Responsibilities of Business', url: 'https://drive.google.com/file/d/1VTToRV6SuxNAYBrTuvawFJF_Bbdqj4uE/preview' },
-            { name: 'Ch 7: Sources of Business Finance', url: 'https://drive.google.com/file/d/1jbvBDygQyta9gtf5c0jBKK5X_eL1vxnS/preview' },
-            { name: 'Ch 8: Small Business', url: 'https://drive.google.com/file/d/1MkZlxMneHlhegZzDb1W5HXC50Xpbkr7Q/preview' },
-            { name: 'Ch 9: Internal Trade', url: 'https://drive.google.com/file/d/1jssbcIwJ0Q1NVrJvAH9vDJi7xLriefXU/preview' },
-            { name: 'Ch 10: International Business - I', url: 'https://drive.google.com/file/d/1BYRUW10PTwVo37O35igAZ6OFFRpEUBg7/preview' },
-            { name: 'Ch 11: International Business - II', url: 'https://drive.google.com/file/d/123rDH2rXFK5Uil7mRaMWv7882VBT9DI_/preview' }
+            { name: 'Ch 6: Social Responsibilities of Business and Business Ethics', url: 'https://drive.google.com/file/d/1VTToRV6SuxNAYBrTuvawFJF_Bbdqj4uE/preview' },
+            { name: 'Ch 7: Formation of a Company', url: 'https://drive.google.com/file/d/1jbvBDygQyta9gtf5c0jBKK5X_eL1vxnS/preview' },
+            { name: 'Ch 8: Source of Business Finance', url: 'https://drive.google.com/file/d/1MkZlxMneHlhegZzDb1W5HXC50Xpbkr7Q/preview' },
+            { name: 'Ch 9: MSME and Business Enterpreneneurship', url: 'https://drive.google.com/file/d/1jssbcIwJ0Q1NVrJvAH9vDJi7xLriefXU/preview' },
+            { name: 'Ch 10: Internal Trade', url: 'https://drive.google.com/file/d/1BYRUW10PTwVo37O35igAZ6OFFRpEUBg7/preview' },
+            { name: 'Ch 11: International Business', url: 'https://drive.google.com/file/d/123rDH2rXFK5Uil7mRaMWv7882VBT9DI_/preview' }
         ]
     },
     {
