@@ -153,10 +153,21 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+        <!-- Scripts -->
     <script src="global.js"></script>
     <script src="data.js"></script>
     <script src="script.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered! Scope:', reg.scope))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
-              </html>
-              
+</html>
+
