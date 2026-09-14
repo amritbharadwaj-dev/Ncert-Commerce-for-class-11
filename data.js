@@ -12,7 +12,6 @@ const booksData = [
             { name: 'Ch 5: Bank Reconciliation Statement', url: 'https://drive.google.com/file/d/1eYpMbXWyAS4CSyoWjaZdMcGaepfPwSf6/preview' },
             { name: 'Ch 6: Trial Balance and Rectification of Errors', url: 'https://drive.google.com/file/d/1GadhbO6iPqKOo0j37ivRilNyCG9SZ4dn/preview' },
             { name: 'Ch 7: Depreciation, Provisions and Reserves', url: 'https://drive.google.com/file/d/1Nt1cy3mTHXB7Y8eLbER-u6G9puj836bz/preview' },
-            { name: 'Ch 8: Bill of Exchange', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
         ]
     },
     {
@@ -21,13 +20,13 @@ const booksData = [
         medium: 'Hindi Medium',
         cover: 'images/acc1_hi_cover.jpg',
         chapters: [
-            { name: 'अध्याय 1: लेखांकन परिचय', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 2: लेखांकन का सैद्धांतिक आधार', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 3: लेन-देनों का अभिलेखन - I', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 4: लेन-देनों का अभिलेखन - II', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 5: बैंक समाधान विवरण', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 6: तलपट एवं अशुद्धियों का सुधार', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
-            { name: 'अध्याय 7: ह्रास, प्रावधान तथा संचय', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' },
+            { name: 'अध्याय 1: लेखांकन परिचय', url: 'https://drive.google.com/file/d/1OGG8G8pibJtBdmeDAQOLcwFeM0IsBm4k/preview' },
+            { name: 'अध्याय 2: लेखांकन का सैद्धांतिक आधार', url: 'https://drive.google.com/file/d/1zX8mauNEa82RcWRM-rAgxH0Pp0prnmjs/preview' },
+            { name: 'अध्याय 3: लेन-देनों का अभिलेखन - I', url: 'https://drive.google.com/file/d/1yGeUeI7XKIyIdjiIKnZ1bkh2FQuJXXCu/preview' },
+            { name: 'अध्याय 4: लेन-देनों का अभिलेखन - II', url: 'https://drive.google.com/file/d/15LoJi-yPcDukGwppokhhsv3YN32MgzG-/preview' },
+            { name: 'अध्याय 5: बैंक समाधान विवरण', url: 'https://drive.google.com/file/d/1LrqWTiSuEeYunWT0BrWSXbioWnb5xyLQ/preview' },
+            { name: 'अध्याय 6: तलपट एवं अशुद्धियों का सुधार', url: 'https://drive.google.com/file/d/13YS5xwf_hZkgTrdPFDD0RbPRydydPB7B/preview' },
+            { name: 'अध्याय 7: ह्रास, प्रावधान तथा संचय', url: 'https://drive.google.com/file/d/1gg3h4iq8OtNP-6bLUmxnnN0SDfhElQR6/preview' },
             { name: 'अध्याय 8: विनिमय विपपत्र', url: 'YOUR_DRIVE_DIRECT_LINK_HERE/preview' }
         ]
     },
