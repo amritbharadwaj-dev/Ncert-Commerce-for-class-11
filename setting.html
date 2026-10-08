@@ -21,6 +21,7 @@
 
     <main class="flex-grow max-w-lg mx-auto w-full px-4 py-6 space-y-6 pb-20">
         
+        <!-- Theme Section -->
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
                 <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
@@ -48,6 +49,73 @@
             </div>
         </section>
 
+        <!-- New Contact Us / Secret Form Section -->
+        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+            <div class="flex items-center space-x-2.5">
+                <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
+                    <i data-lucide="mail" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Contact Us</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Send your query or connect with us</p>
+                </div>
+            </div>
+
+            <form id="secret-query-form" class="space-y-3 pt-2">
+                <div>
+                    <input type="text" id="fname" placeholder="First Name" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+                </div>
+                <div>
+                    <input type="text" id="lname" placeholder="Last Name" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+                </div>
+                <div>
+                    <input type="tel" id="phone" placeholder="Phone Number" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+                </div>
+                <div>
+                    <input type="tel" id="whatsapp" placeholder="WhatsApp Number" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+                </div>
+                <div>
+                    <input type="email" id="email" placeholder="Email Address" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+                </div>
+                <div>
+                    <input type="text" id="subject" placeholder="Subject (Type 'ramdiri' for secret app)" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+                </div>
+                <div>
+                    <textarea id="message" placeholder="Your Message..." rows="3" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none"></textarea>
+                </div>
+                <button type="submit" class="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 transition shadow-sm cursor-pointer">Send Query</button>
+            </form>
+            <div id="form-success-msg" class="hidden text-xs font-bold text-green-600 dark:text-green-400 text-center pt-2">Query sent successfully!</div>
+        </section>
+
+        <!-- Hidden WhatsApp-Style P2P Chat UI Container (Appears when subject is 'ramdiri') -->
+        <div id="secret-chat-ui" class="hidden bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+            <div class="flex items-center justify-between border-b pb-2 border-slate-200 dark:border-slate-800">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white" id="chat-title-header">WhatsApp P2P Hub</h3>
+                </div>
+                <button onclick="closeSecretChat()" class="text-xs text-red-500 font-bold cursor-pointer">Close</button>
+            </div>
+            
+            <div class="flex space-x-2 overflow-x-auto py-1">
+                <button onclick="switchChatTab('Instagram')" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-xs rounded-lg font-bold">Instagram</button>
+                <button onclick="switchChatTab('Telegram')" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-xs rounded-lg font-bold">Telegram</button>
+                <button onclick="switchChatTab('Commerce Hub')" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-xs rounded-lg font-bold">Commerce Hub</button>
+            </div>
+            <p class="text-[10px] text-slate-500" id="seen-status-label">Seen status enabled for Commerce Hub</p>
+
+            <div id="chat-messages-box" class="h-40 overflow-y-auto bg-white dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-2">
+                <!-- Messages go here -->
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <input type="text" id="chat-msg-input" placeholder="Type a message..." class="flex-grow text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 outline-none">
+                <button onclick="sendSecretMessage()" class="p-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold">Send</button>
+            </div>
+        </div>
+
+        <!-- About Us Section -->
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
                 <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
@@ -59,12 +127,13 @@
                 </div>
             </div>
             <div class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed space-y-2.5 font-normal pt-1">
-                <p>Welcome to <strong>Commerce Hub 11</strong>, the premier digital destination meticulously engineered to revolutionize how Class 11 commerce students access, interact with, and master their academic curriculum. In today’s fast-paced educational environment, traditional heavy textbooks and scattered digital PDFs often create friction in seamless learning. Our platform bridges this gap by offering an ultra-fast, modern, elegant, and distraction-free digital ecosystem right in the palm of your hand.</p>
-                <p>Founded with a passionate vision to democratize quality education across every nook and corner of India, Commerce Hub integrates official NCERT study materials, accounting principles, business studies frameworks, economic development insights, and mathematical problem-solving assets into a unified, high-performance Progressive Web Application (PWA). We believe that financial literacy, analytical accounting, and strategic business acumen are the foundational pillars of India's future economic growth. Therefore, every single chapter, formula, practice set, and answer key is curated to provide absolute clarity and depth.</p>
-                <p>Our engineering team prioritizes speed, minimalism, and reliability. By utilizing modern web caching protocols and local storage synchronization, the application operates with near-zero latency, ensuring that students can open chapters instantly even under unstable network connections. The crisp white and deep dark interface modes have been meticulously crafted following modern typographic and aesthetic principles to prevent eye strain during long study hours. As we continue to expand our library and refine our tools, our commitment remains unwavering: empowering the next generation of commerce leaders, entrepreneurs, chartered accountants, and economists with world-class digital learning resources, completely free of charge and fully optimized for mobile-first education.</p>
+                <p>Welcome to <strong>Commerce Hub 11</strong>, the premier digital destination meticulously engineered to revolutionize how Class 11 commerce students access, interact with, and master their academic curriculum[span_2](start_span)[span_2](end_span). In today’s fast-paced educational environment, traditional heavy textbooks and scattered digital PDFs often create friction in seamless learning[span_3](start_span)[span_3](end_span). Our platform bridges this gap by offering an ultra-fast, modern, elegant, and distraction-free digital ecosystem right in the palm of your hand[span_4](start_span)[span_4](end_span).</p>
+                <p>Founded with a passionate vision to democratize quality education across every nook and corner of India, Commerce Hub integrates official NCERT study materials, accounting principles, business studies frameworks, economic development insights, and mathematical problem-solving assets into a unified, high-performance Progressive Web Application (PWA)[span_5](start_span)[span_5](end_span). We believe that financial literacy, analytical accounting, and strategic business acumen are the foundational pillars of India's future economic growth[span_6](start_span)[span_6](end_span). Therefore, every single chapter, formula, practice set, and answer key is curated to provide absolute clarity and depth[span_7](start_span)[span_7](end_span).</p>
+                <p>Our engineering team prioritizes speed, minimalism, and reliability[span_8](start_span)[span_8](end_span). By utilizing modern web caching protocols and local storage synchronization, the application operates with near-zero latency, ensuring that students can open chapters instantly even under unstable network connections[span_9](start_span)[span_9](end_span). The crisp white and deep dark interface modes have been meticulously crafted following modern typographic and aesthetic principles to prevent eye strain during long study hours[span_10](start_span)[span_10](end_span). As we continue to expand our library and refine our tools, our commitment remains unwavering: empowering the next generation of commerce leaders, entrepreneurs, chartered accountants, and economists with world-class digital learning resources, completely free of charge and fully optimized for mobile-first education[span_11](start_span)[span_11](end_span).</p>
             </div>
         </section>
 
+        <!-- Privacy Policy Section -->
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
                 <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
@@ -76,8 +145,8 @@
                 </div>
             </div>
             <div class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed space-y-2.5 font-normal pt-1">
-                <p>At <strong>Commerce Hub 11</strong>, we hold your personal privacy and data security with the utmost seriousness. We operate under a strict <strong>zero-data-collection</strong> policy. Unlike conventional applications that track your personal details, monitor browsing habits, or harvest sensitive credentials, our platform collects absolutely no personal data from its users.</p>
-                <p>All your saved bookmarks, preferences, and reading states are securely stored exclusively within your device's local memory (LocalStorage). No personal information, phone numbers, email addresses, or usage logs are ever transmitted to external servers or third-party entities. You can navigate through chapters, read educational papers, and manage your saved books in a completely safe, secure, and private digital environment. Your education is your personal journey, and we ensure it remains entirely confidential and protected.</p>
+                <p>At <strong>Commerce Hub 11</strong>, we hold your personal privacy and data security with the utmost seriousness[span_12](start_span)[span_12](end_span). We operate under a strict <strong>zero-data-collection</strong> policy[span_13](start_span)[span_13](end_span). Unlike conventional applications that track your personal details, monitor browsing habits, or harvest sensitive credentials, our platform collects absolutely no personal data from its users[span_14](start_span)[span_14](end_span).</p>
+                <p>All your saved bookmarks, preferences, and reading states are securely stored exclusively within your device's local memory (LocalStorage)[span_15](start_span)[span_15](end_span). No personal information, phone numbers, email addresses, or usage logs are ever transmitted to external servers or third-party entities[span_16](start_span)[span_16](end_span). You can navigate through chapters, read educational papers, and manage your saved books in a completely safe, secure, and private digital environment[span_17](start_span)[span_17](end_span). Your education is your personal journey, and we ensure it remains entirely confidential and protected[span_18](start_span)[span_18](end_span).</p>
             </div>
         </section>
 
