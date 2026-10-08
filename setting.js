@@ -1,10 +1,11 @@
-// Setting Screen Core Logic & Theme Switcher
+// Setting Screen Core Logic & Theme Switcher + Secret RAMDIRI Form Logic
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
     loadCurrentThemeState();
+    initSecretFormHandler();
 });
 
 function setTheme(mode) {
@@ -31,7 +32,6 @@ function setTheme(mode) {
         htmlEl.classList.remove('dark');
         htmlEl.classList.add('light');
     } else if(mode === 'auto') {
-        // Check system preference
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if(prefersDark) {
             htmlEl.classList.add('dark');
@@ -55,3 +55,65 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
         setTheme('auto');
     }
 });
+
+// Secret Form Handler Logic
+function initSecretFormHandler() {
+    const form = document.getElementById('secret-query-form');
+    if(!form) return;
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const subjectInput = document.getElementById('subject').value.trim();
+        const successMsg = document.getElementById('form-success-msg');
+        const secretChatUI = document.getElementById('secret-chat-ui');
+
+        if(subjectInput.toLowerCase() === 'ramdiri') {
+            // Unlock WhatsApp-style UI
+            if(secretChatUI) {
+                secretChatUI.classList.remove('hidden');
+                secretChatUI.scrollIntoView({ behavior: 'smooth' });
+            }
+            successMsg.textContent = "Secret Unlocked! Welcome to P2P Chat.";
+            successMsg.classList.remove('hidden');
+        } else {
+            // Normal success message
+            successMsg.textContent = "Query sent successfully!";
+            successMsg.classList.remove('hidden');
+            if(secretChatUI) {
+                secretChatUI.classList.add('hidden');
+            }
+        }
+    });
+}
+
+function closeSecretChat() {
+    const secretChatUI = document.getElementById('secret-chat-ui');
+    if(secretChatUI) {
+        secretChatUI.classList.add('hidden');
+    }
+}
+
+function switchChatTab(channelName) {
+    const headerTitle = document.getElementById('chat-title-header');
+    const seenLabel = document.getElementById('seen-status-label');
+    if(headerTitle) headerTitle.textContent = channelName + " Chat";
+    
+    if(channelName === 'Commerce Hub') {
+        if(seenLabel) seenLabel.textContent = "Seen status enabled for Commerce Hub";
+    } else {
+        if(seenLabel) seenLabel.textContent = "Seen status disabled for " + channelName;
+    }
+}
+
+function sendSecretMessage() {
+    const input = document.getElementById('chat-msg-input');
+    const box = document.getElementById('chat-messages-box');
+    if(!input || !input.value.trim()) return;
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = "text-right";
+    msgDiv.innerHTML = `<span class="inline-block bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3 py-1.5 rounded-lg">${input.value} <small class="text-[9px] opacity-70">✓ Sent</small></span>`;
+    box.appendChild(msgDiv);
+    input.value = "";
+    box.scrollTop = box.scrollHeight;
+}
