@@ -21,76 +21,115 @@ function injectGlobalWidget() {
         const div = document.createElement('div');
         div.innerHTML = `
         <div id="global-widget-root">
-            <!-- Draggable Cartoon Avatar (Snaps to sides, Double Size: w-24 h-24) -->
+            <!-- Draggable support avatar -->
             <div id="floating-avatar-btn" onclick="handleAvatarClick(event)" class="fixed bottom-24 right-4 z-50 w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 p-1 shadow-2xl cursor-pointer hover:scale-105 transition-all duration-300 flex items-center justify-center select-none touch-none">
                 <div class="w-full h-full rounded-full bg-slate-900 overflow-hidden flex items-center justify-center border-3 border-white dark:border-slate-800 shadow-inner">
-                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=CoolBuddy99&backgroundColor=b6e3f4,c0aede,d1d4f9" alt="Cartoon Avatar" class="w-full h-full object-cover">
+                    <img src="https://api.dicebear.com/7.x/bottts/svg?seed=CoolBuddy99&backgroundColor=b6e3f4,c0aede,d1d4f9" alt="Support" class="w-full h-full object-cover">
                 </div>
             </div>
 
-            <!-- Contact Us Bottom Drawer Popup (No Background Blur so background is fully readable) -->
+            <!-- Contact drawer -->
             <div id="contactDrawer" class="fixed inset-0 z-50 bg-black/30 hidden flex items-end justify-center transition-opacity">
-                <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-5 space-y-4 shadow-2xl border-t border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
+                <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-t-3xl p-5 space-y-4 shadow-2xl border-t border-slate-200 dark:border-slate-800 max-h-[88vh] flex flex-col">
                     <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2 min-w-0">
                             <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-1.5 rounded-xl">
                                 <i data-lucide="message-square" class="w-4 h-4"></i>
                             </div>
-                            <h3 class="font-extrabold text-xs text-slate-900 dark:text-white">For any issue please contact us and send message</h3>
+                            <h3 class="font-extrabold text-xs text-slate-900 dark:text-white truncate">For any issue please contact us and send message</h3>
                         </div>
                         <div class="flex items-center space-x-2 flex-shrink-0">
                             <button onclick="toggleTelegramEye()" id="eyeToggleBtn" title="Toggle Live Messages" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                 <i data-lucide="eye" id="eyeIcon" class="w-4 h-4"></i>
                             </button>
-                            <button onclick="toggleContactDrawer()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            <button onclick="toggleContactDrawer()" title="Close" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                 <i data-lucide="x" class="w-4 h-4"></i>
                             </button>
                         </div>
                     </div>
 
-                    <div class="overflow-y-auto space-y-4 pr-1 flex-grow">
-                        <!-- Identity Box (Password Masked Style) -->
+                    <div class="overflow-y-auto space-y-3 pr-1 flex-grow">
+                        <!-- Identity -->
                         <div class="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1.5">
                             <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Your Identity</label>
-                            <input type="password" id="userIdentityInput" oninput="saveUserIdentity(this.value)" class="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-600 font-mono tracking-widest" placeholder="Enter your identity...">
+                            <input type="password" id="userIdentityInput" oninput="saveUserIdentity(this.value)" class="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-3.5 py-2.5 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white font-mono tracking-widest" placeholder="Enter your identity...">
                         </div>
 
-                        <!-- Live Message Box -->
+                        <!-- Live messages -->
                         <div id="liveMessageBox" class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 min-h-[120px] max-h-[260px] overflow-y-auto flex flex-col justify-end space-y-2">
                             <div class="text-xs text-slate-400 italic text-center py-6" id="chatPlaceholder">
                                 Send a message to start conversation.
                             </div>
                         </div>
 
-                        <!-- Attachment preview -->
-                        <div id="attachPreview" class="hidden items-center space-x-2 bg-slate-100 dark:bg-slate-800 rounded-xl p-2 border border-slate-200 dark:border-slate-700">
-                            <div id="attachThumb" class="w-12 h-12 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xl flex-shrink-0"></div>
-                            <div id="attachName" class="flex-grow text-[11px] font-semibold text-slate-700 dark:text-slate-200 truncate"></div>
-                            <button onclick="clearPendingFile()" class="p-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex-shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
+                        <!-- WhatsApp-style selected attachment preview -->
+                        <div id="attachPreview" class="hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                            <div id="attachMediaPreview" class="hidden w-full max-h-64 bg-slate-950 flex items-center justify-center overflow-hidden"></div>
+                            <div class="flex items-center gap-3 p-3">
+                                <div id="attachThumb" class="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 flex-shrink-0">
+                                    <i data-lucide="file" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div id="attachType" class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Attachment</div>
+                                    <div id="attachName" class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate"></div>
+                                </div>
+                                <button onclick="clearPendingFile()" title="Remove attachment" class="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        <!-- Emoji picker -->
-                        <div id="emojiPanel" class="hidden flex-wrap gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-2 border border-slate-200 dark:border-slate-700 text-xl"></div>
-
-                        <!-- Attach menu (WhatsApp style) -->
-                        <div id="attachMenu" class="hidden bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg p-2 flex space-x-2">
-                            <button onclick="pickFile('media')" class="flex-1 flex flex-col items-center space-y-1 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100">
-                                <span class="text-2xl">🖼️</span><span class="text-[10px] font-bold">Photo / Video</span>
+                        <!-- WhatsApp-style attachment menu: Camera / Photo & Video / File -->
+                        <div id="attachMenu" class="hidden flex items-stretch gap-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl p-2">
+                            <button onclick="pickCamera()" class="flex-1 min-w-0 flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-[0.98] transition text-slate-800 dark:text-slate-100">
+                                <span class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                    <i data-lucide="camera" class="w-5 h-5"></i>
+                                </span>
+                                <span class="text-[10px] font-bold">Camera</span>
                             </button>
-                            <button onclick="pickFile('any')" class="flex-1 flex flex-col items-center space-y-1 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100">
-                                <span class="text-2xl">📄</span><span class="text-[10px] font-bold">File / GIF</span>
+                            <button onclick="pickFile('media')" class="flex-1 min-w-0 flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-[0.98] transition text-slate-800 dark:text-slate-100">
+                                <span class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                    <i data-lucide="image" class="w-5 h-5"></i>
+                                </span>
+                                <span class="text-[10px] font-bold">Photo &amp; Video</span>
+                            </button>
+                            <button onclick="pickFile('any')" class="flex-1 min-w-0 flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-[0.98] transition text-slate-800 dark:text-slate-100">
+                                <span class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                    <i data-lucide="file" class="w-5 h-5"></i>
+                                </span>
+                                <span class="text-[10px] font-bold">File</span>
                             </button>
                         </div>
+
+                        <!-- Hidden native pickers -->
                         <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected(this)">
+                        <input type="file" id="cameraInput" class="hidden" accept="image/*,video/*" capture="environment" onchange="handleFileSelected(this)">
 
-                        <!-- Input Bar with + button, emoji and Black Send Button -->
-                        <div class="flex items-center space-x-2 pt-1">
-                            <button onclick="toggleAttachMenu()" title="Attach" class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 text-xl font-bold">+</button>
-                            <input type="text" id="messageInput" placeholder="Type message here..." class="flex-grow min-w-0 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white border border-slate-200 dark:border-slate-700">
-                            <button onclick="toggleEmojiPanel()" title="Emoji" class="text-xl flex-shrink-0">😊</button>
-                            <button onclick="sendTelegramMessage()" class="bg-black hover:bg-slate-800 text-white dark:bg-white dark:text-black dark:hover:bg-slate-200 px-4 py-3 rounded-xl text-xs font-bold transition shadow-md flex items-center space-x-1 flex-shrink-0">
-                                <span>Send</span>
-                                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <!-- Voice recording status -->
+                        <div id="voiceStatus" class="hidden items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2">
+                            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            <span class="text-xs font-semibold text-slate-800 dark:text-slate-100">Recording</span>
+                            <span id="voiceTimer" class="text-xs tabular-nums text-slate-500 dark:text-slate-400">00:00</span>
+                            <span class="flex-1"></span>
+                            <button onclick="stopVoiceRecording()" class="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-black text-white dark:bg-white dark:text-black">Send</button>
+                        </div>
+
+                        <!-- Clean chat bar: plus / text / voice / send -->
+                        <div class="flex items-center gap-2 pt-1">
+                            <button onclick="toggleAttachMenu()" id="attachButton" title="Attach" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                                <i data-lucide="plus" class="w-5 h-5"></i>
+                            </button>
+
+                            <div class="flex-1 min-w-0">
+                                <input type="text" id="messageInput" placeholder="Type message here..." class="w-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs rounded-2xl px-4 py-3 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white">
+                            </div>
+
+                            <button onclick="toggleVoiceRecording()" id="voiceButton" title="Voice recording" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                                <i data-lucide="mic" id="voiceIcon" class="w-5 h-5"></i>
+                            </button>
+
+                            <button onclick="sendTelegramMessage()" id="sendButton" title="Send" class="w-10 h-10 rounded-full bg-black hover:bg-slate-800 text-white dark:bg-white dark:text-black dark:hover:bg-slate-200 flex items-center justify-center flex-shrink-0 transition shadow-md">
+                                <i data-lucide="send" class="w-4 h-4"></i>
                             </button>
                         </div>
                     </div>
@@ -191,6 +230,8 @@ function handleAvatarClick(e) {
 function toggleContactDrawer() {
     const drawer = document.getElementById('contactDrawer');
     if (drawer) {
+        const willClose = !drawer.classList.contains('hidden');
+        if (willClose && mediaRecorder && mediaRecorder.state === 'recording') stopVoiceRecording();
         drawer.classList.toggle('hidden');
         if (!drawer.classList.contains('hidden') && typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -233,7 +274,7 @@ async function sendTelegramMessage() {
     if (pendingFile) { sendMediaFile(text, identity); msgInput.value = ''; return; }
     if (!text) return;
 
-    const fullMessage =`👤 *Identity:* \`${identity}\`\n✉️ *Message:* ${text}`;
+    const fullMessage =`Identity: \`${identity}\`\nMessage: ${text}`;
 
     appendMessageBubble(`You: ${text}`, 'user', 1000); // 1 second disappear
     msgInput.value = '';
@@ -343,14 +384,18 @@ function updateSupportUI(isActive) {
 
 
 
-// ================= MEDIA / ATTACHMENT SYSTEM =================
-const MAX_UPLOAD = 50 * 1024 * 1024; // Telegram bot upload limit 50MB
+// ================= MEDIA / ATTACHMENT + VOICE SYSTEM =================
+const MAX_UPLOAD = 50 * 1024 * 1024; // 50 MB
 let pendingFile = null;
 let pendingURL = null;
-const EMOJIS = ['😀','😂','🤣','😊','😍','😘','😎','🥰','😢','😭','😡','😮','🤔','👍','👎','🙏','👏','🔥','❤️','💔','🎉','✅','❌','💯','🙌','😴','🤝','👀','🥳','😅','🤗','💪'];
+let mediaRecorder = null;
+let recordedChunks = [];
+let voiceRecordingStartedAt = 0;
+let voiceTimerInterval = null;
+let voiceMimeType = '';
 
 function closePanels() {
-    ['attachMenu', 'emojiPanel'].forEach(id => {
+    ['attachMenu'].forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
     });
@@ -361,73 +406,308 @@ function togglePanel(id) {
     if (!el) return;
     const wasHidden = el.classList.contains('hidden');
     closePanels();
-    if (wasHidden) { el.classList.remove('hidden'); el.classList.add('flex'); }
+    if (wasHidden) {
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
 }
 
-function toggleAttachMenu() { togglePanel('attachMenu'); }
+function toggleAttachMenu() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') return;
+    togglePanel('attachMenu');
+}
 
-function toggleEmojiPanel() {
-    const panel = document.getElementById('emojiPanel');
-    if (panel && !panel.dataset.ready) {
-        EMOJIS.forEach(e => {
-            const b = document.createElement('button');
-            b.textContent = e;
-            b.onclick = () => {
-                const inp = document.getElementById('messageInput');
-                inp.value += e;
-                inp.focus();
-            };
-            panel.appendChild(b);
-        });
-        panel.dataset.ready = '1';
-    }
-    togglePanel('emojiPanel');
+function pickCamera() {
+    const input = document.getElementById('cameraInput');
+    if (!input) return;
+    closePanels();
+    input.value = '';
+    input.click();
 }
 
 function pickFile(kind) {
-    const fi = document.getElementById('fileInput');
-    if (!fi) return;
-    fi.accept = kind === 'media' ? 'image/*,video/*' : '*/*';
-    fi.value = '';
+    const input = document.getElementById('fileInput');
+    if (!input) return;
+    input.accept = kind === 'media' ? 'image/*,video/*' : '*/*';
+    input.value = '';
     closePanels();
-    fi.click();
+    input.click();
 }
 
 function handleFileSelected(input) {
     const file = input.files && input.files[0];
     if (!file) return;
+
     if (file.size > MAX_UPLOAD) {
-        alert('File 50 MB se badi hai, Telegram nahi lega.');
+        alert('File 50 MB se badi hai. 50 MB tak file hi bheji ja sakti hai.');
         input.value = '';
         return;
     }
+
     clearPendingFile();
     pendingFile = file;
+
     const thumb = document.getElementById('attachThumb');
     const name = document.getElementById('attachName');
-    thumb.innerHTML = '';
-    if (file.type.startsWith('image/')) {
-        pendingURL = URL.createObjectURL(file);
-        thumb.innerHTML = '<img src="' + pendingURL + '" class="w-full h-full object-cover">';
-    } else if (file.type.startsWith('video/')) {
-        pendingURL = URL.createObjectURL(file);
-        thumb.innerHTML = '<video src="' + pendingURL + '" class="w-full h-full object-cover" muted></video>';
-    } else {
-        thumb.textContent = '📄';
-    }
-    name.textContent = file.name + ' (' + (file.size / 1048576).toFixed(1) + ' MB)';
+    const typeLabel = document.getElementById('attachType');
+    const mediaPreview = document.getElementById('attachMediaPreview');
     const prev = document.getElementById('attachPreview');
+
+    if (!thumb || !name || !typeLabel || !prev) return;
+
+    thumb.innerHTML = '';
+    mediaPreview.innerHTML = '';
+    mediaPreview.classList.add('hidden');
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (pendingURL) URL.revokeObjectURL(pendingURL);
+    if (isImage || isVideo) {
+        pendingURL = URL.createObjectURL(file);
+        const media = document.createElement(isImage ? 'img' : 'video');
+        media.src = pendingURL;
+        media.className = 'w-full max-h-64 object-contain';
+        if (isVideo) {
+            media.muted = true;
+            media.playsInline = true;
+            media.controls = true;
+        }
+        mediaPreview.appendChild(media);
+        mediaPreview.classList.remove('hidden');
+
+        const icon = isImage ? 'image' : 'video';
+        thumb.innerHTML = '<i data-lucide="' + icon + '" class="w-5 h-5"></i>';
+        typeLabel.textContent = isImage ? 'Photo' : 'Video';
+    } else {
+        thumb.innerHTML = '<i data-lucide="file" class="w-5 h-5"></i>';
+        typeLabel.textContent = 'File';
+    }
+
+    name.textContent = file.name + ' · ' + formatFileSize(file.size);
     prev.classList.remove('hidden');
-    prev.classList.add('flex');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Scroll the attachment preview into view on mobile.
+    requestAnimationFrame(() => prev.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
 function clearPendingFile() {
     pendingFile = null;
-    if (pendingURL) { URL.revokeObjectURL(pendingURL); pendingURL = null; }
+    if (pendingURL) {
+        URL.revokeObjectURL(pendingURL);
+        pendingURL = null;
+    }
+
     const prev = document.getElementById('attachPreview');
-    if (prev) { prev.classList.add('hidden'); prev.classList.remove('flex'); }
-    const fi = document.getElementById('fileInput');
-    if (fi) fi.value = '';
+    const mediaPreview = document.getElementById('attachMediaPreview');
+    const thumb = document.getElementById('attachThumb');
+    const name = document.getElementById('attachName');
+
+    if (mediaPreview) {
+        mediaPreview.innerHTML = '';
+        mediaPreview.classList.add('hidden');
+    }
+    if (thumb) thumb.innerHTML = '<i data-lucide="file" class="w-5 h-5"></i>';
+    if (name) name.textContent = '';
+    if (prev) prev.classList.add('hidden');
+
+    ['fileInput', 'cameraInput'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+    });
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// ================= VOICE RECORDING =================
+function getSupportedAudioMimeType() {
+    const types = [
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm'
+    ];
+    return types.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+}
+
+async function toggleVoiceRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        stopVoiceRecording();
+    } else {
+        await startVoiceRecording();
+    }
+}
+
+async function startVoiceRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+        alert('Is device/browser me voice recording supported nahi hai.');
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        voiceMimeType = getSupportedAudioMimeType();
+        mediaRecorder = voiceMimeType
+            ? new MediaRecorder(stream, { mimeType: voiceMimeType })
+            : new MediaRecorder(stream);
+
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) recordedChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach(track => track.stop());
+            stopVoiceTimer();
+
+            const finalType = voiceMimeType || 'audio/webm';
+            const blob = new Blob(recordedChunks, { type: finalType });
+            recordedChunks = [];
+
+            if (!blob.size) {
+                resetVoiceUI();
+                return;
+            }
+
+            await sendVoiceRecording(blob, finalType);
+        };
+
+        mediaRecorder.start(250);
+        voiceRecordingStartedAt = Date.now();
+        setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') stopVoiceRecording();
+        }, 5 * 60 * 1000);
+
+        const status = document.getElementById('voiceStatus');
+        const button = document.getElementById('voiceButton');
+        const icon = document.getElementById('voiceIcon');
+
+        if (status) {
+            status.classList.remove('hidden');
+            status.classList.add('flex');
+        }
+        if (button) {
+            button.classList.add('bg-red-50', 'text-red-600', 'border-red-200');
+            button.classList.remove('bg-slate-100', 'text-slate-800', 'dark:bg-slate-800', 'dark:text-slate-100');
+        }
+        if (icon) icon.setAttribute('data-lucide', 'square');
+
+        startVoiceTimer();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    } catch (err) {
+        console.error('Microphone permission/recording failed:', err);
+        alert('Microphone permission allow karke dobara try karein.');
+        resetVoiceUI();
+    }
+}
+
+function stopVoiceRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+    }
+}
+
+function startVoiceTimer() {
+    stopVoiceTimer();
+    updateVoiceTimer();
+    voiceTimerInterval = setInterval(updateVoiceTimer, 1000);
+}
+
+function updateVoiceTimer() {
+    const timer = document.getElementById('voiceTimer');
+    if (!timer) return;
+    const elapsed = Math.floor((Date.now() - voiceRecordingStartedAt) / 1000);
+    const minutes = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const seconds = String(elapsed % 60).padStart(2, '0');
+    timer.textContent = minutes + ':' + seconds;
+}
+
+function stopVoiceTimer() {
+    if (voiceTimerInterval) clearInterval(voiceTimerInterval);
+    voiceTimerInterval = null;
+}
+
+function resetVoiceUI() {
+    stopVoiceTimer();
+
+    const status = document.getElementById('voiceStatus');
+    const button = document.getElementById('voiceButton');
+    const icon = document.getElementById('voiceIcon');
+    const timer = document.getElementById('voiceTimer');
+
+    if (status) {
+        status.classList.add('hidden');
+        status.classList.remove('flex');
+    }
+    if (button) {
+        button.classList.remove('bg-red-50', 'text-red-600', 'border-red-200');
+        button.classList.add('bg-slate-100', 'text-slate-800', 'dark:bg-slate-800', 'dark:text-slate-100');
+    }
+    if (icon) icon.setAttribute('data-lucide', 'mic');
+    if (timer) timer.textContent = '00:00';
+    mediaRecorder = null;
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function sendVoiceRecording(blob, mimeType) {
+    const identityInput = document.getElementById('userIdentityInput');
+    const identity = identityInput ? identityInput.value : 'Anonymous';
+
+    const extension = mimeType.includes('ogg') ? 'ogg'
+        : mimeType.includes('mp4') ? 'm4a'
+        : 'webm';
+
+    const filename = 'voice_' + Date.now() + '.' + extension;
+
+    const bubble = createBubble('user');
+    if (bubble) {
+        bubble.innerHTML = '<div class="flex items-center gap-2"><i data-lucide="mic" class="w-4 h-4"></i><span>Voice recording</span></div><div class="text-[10px] opacity-70 mt-1" id="voice-send-status">Sending…</div>';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    const fd = new FormData();
+    fd.append('chat_id', TG_CHAT_ID);
+    fd.append('caption', 'Identity: ' + identity);
+
+    // Telegram voice messages prefer OGG/OPUS. Browser fallbacks are sent as a document
+    // so the recording is still delivered instead of silently failing.
+    const canSendAsVoice = mimeType.includes('ogg');
+    const method = canSendAsVoice ? 'sendVoice' : 'sendDocument';
+    const field = canSendAsVoice ? 'voice' : 'document';
+    fd.append(field, blob, filename);
+
+    try {
+        const response = await fetch('https://api.telegram.org/bot' + TG_BOT_TOKEN + '/' + method, {
+            method: 'POST',
+            body: fd
+        });
+        const data = await response.json();
+
+        if (bubble) {
+            const status = bubble.querySelector('#voice-send-status');
+            if (status) status.textContent = data.ok ? 'Sent' : 'Failed';
+            removeBubbleLater(bubble, data.ok ? 1000 : 3000);
+        }
+    } catch (err) {
+        console.error('Voice upload failed:', err);
+        if (bubble) {
+            const status = bubble.querySelector('#voice-send-status');
+            if (status) status.textContent = 'Failed';
+            removeBubbleLater(bubble, 3000);
+        }
+    } finally {
+        resetVoiceUI();
+    }
 }
 
 function createBubble(sender) {
@@ -460,51 +740,86 @@ function removeBubbleLater(bubble, ms) {
 function sendMediaFile(text, identity) {
     const file = pendingFile;
     const localURL = pendingURL;
-    pendingFile = null; pendingURL = null; // bubble will use localURL
+    pendingFile = null;
+    pendingURL = null;
+
     const prev = document.getElementById('attachPreview');
-    if (prev) { prev.classList.add('hidden'); prev.classList.remove('flex'); }
+    if (prev) prev.classList.add('hidden');
+
+    if (!file) return;
 
     const type = file.type || '';
     const isGif = type === 'image/gif';
-    let method = 'sendDocument', field = 'document';
-    if (isGif) { method = 'sendAnimation'; field = 'animation'; }
-    else if (type.startsWith('image/') && file.size <= 10 * 1048576) { method = 'sendPhoto'; field = 'photo'; }
-    else if (type.startsWith('video/')) { method = 'sendVideo'; field = 'video'; }
+
+    // Telegram's sendPhoto has a smaller image limit, so larger images are sent as documents.
+    let method = 'sendDocument';
+    let field = 'document';
+    if (isGif) {
+        method = 'sendAnimation';
+        field = 'animation';
+    } else if (type.startsWith('image/') && file.size <= 10 * 1048576) {
+        method = 'sendPhoto';
+        field = 'photo';
+    } else if (type.startsWith('video/')) {
+        method = 'sendVideo';
+        field = 'video';
+    }
 
     const bubble = createBubble('user');
     if (!bubble) return;
-    let preview = '';
-    if (localURL && type.startsWith('image/')) preview = '<img src="' + localURL + '" class="rounded-lg max-h-40 mb-1">';
-    else if (localURL && type.startsWith('video/')) preview = '<video src="' + localURL + '" class="rounded-lg max-h-40 mb-1" muted></video>';
-    else preview = '<div class="mb-1">📄 ' + escapeHtml(file.name) + '</div>';
-    bubble.innerHTML = preview + (text ? '<div>You: ' + escapeHtml(text) + '</div>' : '') + '<div class="text-[10px] opacity-70" id="upl-status">Sending… 0%</div>';
-    const status = bubble.querySelector('#upl-status');
-    status.removeAttribute('id');
 
+    let preview = '';
+    if (localURL && type.startsWith('image/')) {
+        preview = '<img src="' + localURL + '" class="rounded-lg max-h-40 max-w-full object-contain mb-1">';
+    } else if (localURL && type.startsWith('video/')) {
+        preview = '<video src="' + localURL + '" class="rounded-lg max-h-40 max-w-full object-contain mb-1" controls muted playsinline></video>';
+    } else {
+        preview = '<div class="flex items-center gap-2 mb-1"><i data-lucide="file" class="w-4 h-4"></i><span>' + escapeHtml(file.name) + '</span></div>';
+    }
+
+    bubble.innerHTML = preview
+        + (text ? '<div>You: ' + escapeHtml(text) + '</div>' : '')
+        + '<div class="text-[10px] opacity-70" id="upl-status">Sending… 0%</div>';
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    const status = bubble.querySelector('#upl-status');
     const fd = new FormData();
     fd.append('chat_id', TG_CHAT_ID);
     fd.append(field, file, file.name);
-    fd.append('caption', '👤 Identity: ' + identity + (text ? '\n✉️ Message: ' + text : ''));
+    fd.append('caption', 'Identity: ' + identity + (text ? '\nMessage: ' + text : ''));
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', 'https://api.telegram.org/bot' + TG_BOT_TOKEN + '/' + method);
+
     xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) status.textContent = 'Sending… ' + Math.round(e.loaded / e.total * 100) + '%';
+        if (e.lengthComputable && status) {
+            status.textContent = 'Sending… ' + Math.round(e.loaded / e.total * 100) + '%';
+        }
     };
+
     xhr.onload = () => {
         let ok = false;
         try { ok = JSON.parse(xhr.responseText).ok; } catch (e) {}
-        status.textContent = ok ? 'Sent ✓' : 'Failed ✗';
-        removeBubbleLater(bubble, ok ? 1000 : 3000); // user media: 1 second
-        setTimeout(() => { if (localURL) URL.revokeObjectURL(localURL); }, 5000);
+
+        if (status) status.textContent = ok ? 'Sent' : 'Failed';
+        removeBubbleLater(bubble, ok ? 1000 : 3000);
+
+        if (localURL) setTimeout(() => URL.revokeObjectURL(localURL), 5000);
     };
+
     xhr.onerror = () => {
-        status.textContent = 'Failed ✗ (internet check karo)';
+        if (status) status.textContent = 'Failed';
         removeBubbleLater(bubble, 3000);
+        if (localURL) setTimeout(() => URL.revokeObjectURL(localURL), 5000);
     };
+
     xhr.send(fd);
-    const fi = document.getElementById('fileInput');
-    if (fi) fi.value = '';
+
+    ['fileInput', 'cameraInput'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+    });
 }
 
 function escapeHtml(str) {
@@ -519,8 +834,8 @@ async function showIncomingMedia(m) {
     else if (m.video) { fileId = m.video.file_id; kind = 'video'; }
     else if (m.video_note) { fileId = m.video_note.file_id; kind = 'video'; }
     else if (m.sticker) {
-        if (m.sticker.is_animated) { kind = 'emoji'; label = m.sticker.emoji || '🙂'; }
-        else { fileId = m.sticker.file_id; kind = m.sticker.is_video ? 'video-loop' : 'sticker'; label = m.sticker.emoji || ''; }
+        if (m.sticker.is_animated) { fileId = m.sticker.file_id; kind = 'video-loop'; }
+        else { fileId = m.sticker.file_id; kind = m.sticker.is_video ? 'video-loop' : 'sticker'; label = ''; }
     }
     else if (m.voice) { fileId = m.voice.file_id; kind = 'audio'; }
     else if (m.audio) { fileId = m.audio.file_id; kind = 'audio'; }
@@ -539,8 +854,7 @@ async function showIncomingMedia(m) {
     let timerStarted = false;
     const startTimer = () => { if (!timerStarted) { timerStarted = true; removeBubbleLater(bubble, 3000); } };
 
-    if (kind === 'emoji') { bubble.innerHTML = '<div class="text-5xl">' + label + '</div>' + caption; startTimer(); return; }
-    if (!fileId) { bubble.innerHTML = '<div>Developer: 📄 ' + escapeHtml(label) + '</div>' + caption; startTimer(); return; }
+    if (!fileId) { bubble.innerHTML = '<div class="flex items-center gap-2"><i data-lucide="file" class="w-4 h-4"></i><span>Developer: ' + escapeHtml(label) + '</span></div>' + caption; if (typeof lucide !== 'undefined') lucide.createIcons(); startTimer(); return; }
 
     bubble.innerHTML = '<div class="opacity-70">Loading…</div>';
     try {
@@ -571,7 +885,8 @@ async function showIncomingMedia(m) {
         if (box) box.scrollTop = box.scrollHeight;
         setTimeout(startTimer, 8000); // fallback
     } catch (err) {
-        bubble.innerHTML = '<div>Developer: 📎 (media load nahi hua, 20MB se badi ho sakti hai)</div>' + caption;
+        bubble.innerHTML = '<div class="flex items-center gap-2"><i data-lucide="file-warning" class="w-4 h-4"></i><span>Developer: Media load nahi hua.</span></div>' + caption;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
         startTimer();
     }
 }
