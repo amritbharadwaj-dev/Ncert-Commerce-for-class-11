@@ -1,339 +1,1351 @@
-// Commerce Hub Settings + private chat. Existing theme functions are preserved below.
-const SUPABASE_URL = 'https://dvbbcfntfzkvepzertte.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_skOK2qGKqEnP9-6qpNC5nA_crr-FZR3';
-const MSG_TABLE = 'private_messages';
-const SIGNAL_TABLE = 'call_signals';
-const MEDIA_BUCKET = 'private-chat-media';
-const CHAT_LOCAL_KEY = 'ch11_chat_messages_v2';
-const PROFILE_KEY = 'ch11_chat_profile_v2';
-const PEER_KEY = 'ch11_chat_peer_v2';
-let supabaseClient = null, authUser = null, activeProfile = localStorage.getItem(PROFILE_KEY) || '';
-let presenceChannel = null, remoteTypingTimer = null, localTypingTimer = null;
-let peerId = localStorage.getItem(PEER_KEY) || '', channel = null, signalChannel = null;
-let activeCall = null, localStream = null, remoteStream = null, callMuted = false, pendingIce = [];
-let messageFetchBusy = false;
-let selectedMessageId = null, editingId = null, replyToId = null;
-const $ = id => document.getElementById(id);
-const uuid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const localMessages = () => { try { return JSON.parse(localStorage.getItem(CHAT_LOCAL_KEY) || '[]'); } catch { return []; } };
-const saveLocalMessages = rows => { try { localStorage.setItem(CHAT_LOCAL_KEY, JSON.stringify(rows)); } catch { alert('Local storage is full. Remove large attachments or clear some chat history.'); } };
-const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function openOverlay(el) { el.classList.add('active'); el.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
-function closeOverlay(el) { el.classList.remove('active'); el.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
-function openChat() { openOverlay($('chatPage')); updateChatHeader(); renderMessages(); markReceivedSeen(); }
-async function markReceivedSeen() {
-  if(!supabaseClient||!authUser||!navigator.onLine)return;
-  try { await supabaseClient.from(MSG_TABLE).update({delivered_at:new Date().toISOString(),seen_at:new Date().toISOString()}).eq('recipient_id',authUser.id).is('seen_at',null); } catch {}
-}
-function updateChatHeader() {
-  if (!$('chatTitle')) return;
-  $('profileChooser').style.display = activeProfile ? 'none' : 'block';
-  $('chatTitle').textContent = activeProfile ? (activeProfile === 'Radhe' ? 'Amrit' : 'Radhe') : 'Private chat';
-  $('chatAvatar').textContent = activeProfile === 'Radhe' ? 'A' : activeProfile === 'Amrit' ? 'R' : 'A';
-  const connected = !!(authUser && peerId && navigator.onLine && supabaseClient);
-  const pstate=presenceChannel?.presenceState?.()||{};
-  const peerOnline=!!peerId && Object.keys(pstate).some(id=>id!==authUser?.id && (pstate[id]||[]).length>0);
-  $('chatPresence').textContent = !navigator.onLine ? 'offline' : peerOnline ? 'online' : connected ? 'Ready to chat' : authUser ? 'Waiting for connection' : 'Starting…';
-  $('connectionNotice').textContent = !navigator.onLine ? 'Offline: messages stay on this device and will queue for sync when back online.' :
-    !peerId ? 'Choose your profile, then use ⋮ → Connect device and exchange device IDs to enable private sync.' :
-    'Messages are saved locally first. Supabase sync is attempted while online.';
-}
-function renderMessages() {
-  const box = $('messageList'); if (!box) return;
-  const rows = localMessages().filter(m => !m.deletedForMe);
-  box.innerHTML = rows.map(m => {
-    const mine = m.sender === activeProfile;
-    let body = m.kind === 'image' ? `<img src="${escapeHtml(m.dataUrl || m.signedUrl || '')}" alt="Image attachment">` :
-      m.kind === 'video' ? `<video src="${escapeHtml(m.dataUrl || m.signedUrl || '')}" controls playsinline></video>` : escapeHtml(m.text);
-    const quote = m.replyText ? `<div class="reply-quote">${escapeHtml(m.replyText)}</div>` : '';
-    return `<article class="bubble ${mine?'mine':''}" data-message-id="${escapeHtml(m.id)}" tabindex="0">${quote}${body}${m.reaction?`<span>${escapeHtml(m.reaction)}</span>`:''}<div class="meta"><span>${m.edited?'edited · ':''}${new Date(m.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span><span class="ticks ${m.seen?'seen':''}">${mine?(m.seen?'✓✓':m.delivered?'✓✓':'✓'):''}</span></div></article>`;
-  }).join('');
-  box.scrollTop = box.scrollHeight;
-}
-function mergeMessage(message) {
-  const rows = localMessages(); const index = rows.findIndex(x => x.id === message.id);
-  if (index >= 0) rows[index] = {...rows[index], ...message}; else rows.push(message);
-  rows.sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt)); saveLocalMessages(rows); renderMessages();
-}
-async function initBackend() {
-  if (!navigator.onLine || !window.supabase?.createClient) return;
-  try {
-    if (!supabaseClient) supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-    });
-    let {data:{session}} = await supabaseClient.auth.getSession();
-    if (!session) {
-      const result = await supabaseClient.auth.signInAnonymously();
-      if (result.error) throw result.error;
-      session = result.data.session;
+// Setting Screen Core Logic & Theme Switcher
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
     }
-    authUser = session?.user || null;
-    if (authUser) {
-      $('myPeerId').value = authUser.id;
-      subscribeMessages();
-      subscribeSignals();
-      initPresenceChannel();
-      if(peerId) await syncQueuedMessages(); else await loadRemoteHistory();
-    }
-    updateChatHeader();
-  } catch (error) {
-    console.warn('Backend not configured or unavailable:', error.message);
-    if ($('chatPresence')) $('chatPresence').textContent = navigator.onLine ? 'Local mode' : 'offline';
-  }
-}
-function mapServerMessage(row, signedUrl='') {
-  return {
-    id: row.id, serverId: row.id,
-    sender: row.sender_name,
-    recipient: row.sender_id === authUser?.id ? (activeProfile === 'Radhe' ? 'Amrit' : 'Radhe') : activeProfile,
-    text: row.body || '', kind: row.kind || 'text',
-    storagePath: row.storage_path || null, signedUrl: signedUrl || '',
-    createdAt: row.created_at, delivered: !!row.delivered_at,
-    seen: !!row.seen_at, edited: !!row.edited,
-    reaction: row.reaction || '', replyText: row.reply_text || '',
-    deletedForMe: false
-  };
-}
-async function signedMediaUrl(path) {
-  if (!path || !supabaseClient) return '';
-  const {data,error}=await supabaseClient.storage.from(MEDIA_BUCKET).createSignedUrl(path, 3600);
-  if (error) { console.warn('Could not open attachment:',error.message); return ''; }
-  return data?.signedUrl || '';
-}
-async function hydrateServerMessage(row) {
-  const url = row.storage_path ? await signedMediaUrl(row.storage_path) : '';
-  mergeMessage(mapServerMessage(row,url));
-}
-async function loadRemoteHistory() {
-  if (!supabaseClient || !authUser || messageFetchBusy || !navigator.onLine) return;
-  messageFetchBusy=true;
-  try {
-    const {data,error}=await supabaseClient.from(MSG_TABLE).select('*').order('created_at',{ascending:true}).limit(500);
-    if (error) throw error;
-    for (const row of (data||[])) await hydrateServerMessage(row);
-    // Mark received messages as delivered; when the chat is open, mark them seen too.
-    const received=(data||[]).filter(r=>r.recipient_id===authUser.id && !r.seen_at);
-    for (const row of received) {
-      const patch={delivered_at:row.delivered_at || new Date().toISOString()};
-      if ($('chatPage')?.classList.contains('active')) patch.seen_at=new Date().toISOString();
-      await supabaseClient.from(MSG_TABLE).update(patch).eq('id',row.id);
-    }
-  } catch(e) { console.warn('History sync unavailable:',e.message); }
-  finally { messageFetchBusy=false; }
-}
-function subscribeMessages() {
-  if (!supabaseClient || !authUser) return;
-  if (channel) supabaseClient.removeChannel(channel);
-  channel = supabaseClient.channel(`messages-${authUser.id}`)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:MSG_TABLE,filter:`recipient_id=eq.${authUser.id}`},async payload=>{
-      const row=payload.new;
-      await hydrateServerMessage(row);
-      const patch={delivered_at:row.delivered_at || new Date().toISOString()};
-      if ($('chatPage')?.classList.contains('active')) patch.seen_at=new Date().toISOString();
-      await supabaseClient.from(MSG_TABLE).update(patch).eq('id',row.id);
-    })
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:MSG_TABLE,filter:`sender_id=eq.${authUser.id}`},async payload=>{
-      const row=payload.new, url=row.storage_path?await signedMediaUrl(row.storage_path):'';
-      const rows=localMessages().map(m=>m.serverId===row.id?{...m, text:row.body||'', reaction:row.reaction||'', edited:!!row.edited, delivered:!!row.delivered_at, seen:!!row.seen_at, signedUrl:url}:m);
-      saveLocalMessages(rows);renderMessages();
-    })
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:MSG_TABLE,filter:`recipient_id=eq.${authUser.id}`},async payload=>{
-      const row=payload.new, url=row.storage_path?await signedMediaUrl(row.storage_path):'';
-      const rows=localMessages().map(m=>m.serverId===row.id?{...m, text:row.body||'', reaction:row.reaction||'', edited:!!row.edited, delivered:!!row.delivered_at, seen:!!row.seen_at, signedUrl:url}:m);
-      saveLocalMessages(rows);renderMessages();
-    }).subscribe();
-}
-function initPresenceChannel() {
-  if (!supabaseClient || !authUser) return;
-  if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
-  const pairKey=[authUser.id,peerId||'unpaired'].sort().join('-');
-  presenceChannel=supabaseClient.channel(`private-presence-${pairKey}`,{config:{presence:{key:authUser.id},broadcast:{self:false}}})
-    .on('presence',{event:'sync'},()=>{
-      const state=presenceChannel.presenceState();
-      const otherOnline=Object.keys(state).some(id=>id!==authUser.id && (state[id]||[]).length>0);
-      if ($('chatPresence') && !remoteTypingTimer) $('chatPresence').textContent=otherOnline?'online':(navigator.onLine?'offline':'offline');
-    })
-    .on('broadcast',{event:'typing'},payload=>{
-      if (!$('chatPresence')) return;
-      if (payload.payload?.typing) {
-        $('chatPresence').textContent='typing…';
-        if (remoteTypingTimer) clearTimeout(remoteTypingTimer);
-        remoteTypingTimer=setTimeout(()=>{remoteTypingTimer=null;updateChatHeader();},1800);
-      } else if (remoteTypingTimer) {
-        clearTimeout(remoteTypingTimer);remoteTypingTimer=null;updateChatHeader();
-      }
-    })
-    .subscribe(async status=>{
-      if(status==='SUBSCRIBED') {
-        try { await presenceChannel.track({name:activeProfile||'Guest',online_at:new Date().toISOString()}); } catch {}
-      }
-    });
-}
-function broadcastTyping(typing) {
-  if (!presenceChannel || !authUser) return;
-  presenceChannel.send({type:'broadcast',event:'typing',payload:{name:activeProfile,typing:!!typing}}).catch(()=>{});
-}
-function subscribeSignals() {
-  if (!supabaseClient || !authUser) return;
-  if (signalChannel) supabaseClient.removeChannel(signalChannel);
-  signalChannel=supabaseClient.channel(`signals-${authUser.id}`)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:SIGNAL_TABLE,filter:`recipient_id=eq.${authUser.id}`},payload=>handleSignal(payload.new))
-    .subscribe();
-}
-async function syncQueuedMessages() {
-  if (!supabaseClient || !authUser || !peerId || !navigator.onLine) return;
-  const pending=localMessages().filter(m=>m.sender===activeProfile&&!m.serverId&&!m.deletedForMe&&((m.kind==='text'&&m.text)||m.dataUrl));
-  for (const m of pending) await sendToServer(m);
-  await loadRemoteHistory();
-}
-async function sendToServer(m) {
-  if (!supabaseClient || !authUser || !peerId || !navigator.onLine || m.serverId) return false;
-  let storagePath=null;
-  try {
-    if (m.dataUrl && (m.kind==='image'||m.kind==='video')) {
-      const blob=await (await fetch(m.dataUrl)).blob();
-      const ext=(blob.type.split('/')[1]|| (m.kind==='video'?'mp4':'jpg')).replace(/[^a-z0-9]/gi,'').slice(0,8)||'bin';
-      storagePath=`${authUser.id}/${peerId}/${m.id}.${ext}`;
-      const {error:uploadError}=await supabaseClient.storage.from(MEDIA_BUCKET).upload(storagePath,blob,{contentType:blob.type,upsert:true});
-      if(uploadError) throw uploadError;
-    }
-    const {data,error}=await supabaseClient.from(MSG_TABLE).insert({
-      sender_id:authUser.id,recipient_id:peerId,sender_name:activeProfile,body:m.text||'',kind:m.kind||'text',storage_path:storagePath,reply_text:m.replyText||'',reaction:m.reaction||'',created_at:m.createdAt
-    }).select('*').single();
-    if(error) throw error;
-    const url=storagePath?await signedMediaUrl(storagePath):'';
-    const rows=localMessages().map(x=>x.id===m.id?{...x,serverId:data.id,storagePath,signedUrl:url}:x);saveLocalMessages(rows);renderMessages();return true;
-  } catch(error) { console.warn('Message remains queued locally:',error.message); return false; }
-}
-async function updateServerMessage(m, patch) {
-  if (!supabaseClient || !authUser || !m?.serverId || !navigator.onLine) return;
-  const safe={};
-  for (const k of ['body','reaction','edited']) if (k in patch) safe[k]=patch[k];
-  let query=supabaseClient.from(MSG_TABLE).update(safe).eq('id',m.serverId);
-  if ('body' in safe || 'edited' in safe) query=query.eq('sender_id',authUser.id);
-  const {error}=await query;
-  if(error) console.warn('Message update stayed local:',error.message);
-}
-async function sendMessage(text, attachment=null, replyText='') {
-  if (!activeProfile) { alert('Please choose who you are first.'); return; }
-  const m={id:uuid(),sender:activeProfile,recipient:activeProfile==='Radhe'?'Amrit':'Radhe',text:text||'',kind:attachment?.kind||'text',dataUrl:attachment?.dataUrl||null,createdAt:new Date().toISOString(),delivered:false,seen:false,edited:false,replyText};
-  mergeMessage(m);
-  if ((m.kind==='text' && m.text) || m.dataUrl) await sendToServer(m);
-}
-function openActions(id) { selectedMessageId=id; $('actionSheet').hidden=false; }
-function closeActions() { $('actionSheet').hidden=true; selectedMessageId=null; }
-async function startCall(video) {
-  if (!activeProfile) return alert('Choose your profile first.');
-  if (!navigator.onLine || !peerId || !authUser || !supabaseClient) return alert(`${activeProfile} tried to call you, but you are offline or not connected.`);
-  try {
-    localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:!!video});
-    remoteStream=new MediaStream(); $('localVideo').srcObject=localStream; $('remoteVideo').srcObject=remoteStream;
-    pendingIce=[];activeCall=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-    localStream.getTracks().forEach(track=>activeCall.addTrack(track,localStream));
-    activeCall.ontrack=e=>e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
-    activeCall.onicecandidate=e=>{if(e.candidate) sendSignal('ice',{candidate:e.candidate.toJSON()});};
-    const offer=await activeCall.createOffer();await activeCall.setLocalDescription(offer);
-    await sendSignal('offer',{sdp:offer.sdp,video:!!video});
-    $('callPanel').hidden=false;
-  } catch(e) { endCall(); alert('Call could not start: '+e.message); }
-}
-async function sendSignal(type,payload) {
-  if(!supabaseClient||!authUser||!peerId)return;
-  const {error}=await supabaseClient.from(SIGNAL_TABLE).insert({sender_id:authUser.id,recipient_id:peerId,signal_type:type,payload});
-  if(error) console.warn('Call signaling failed:',error.message);
-}
-async function handleSignal(signal) {
-  if(!supabaseClient||!authUser)return;
-  // Ignore signaling from an unexpected peer.
-  if(peerId && signal.sender_id!==peerId)return;
-  try {
-    if(signal.signal_type==='offer') {
-      if(!activeProfile)return;
-      if(!activeCall && !confirm(`${activeProfile==='Radhe'?'Amrit':'Radhe'} is calling. Accept ${signal.payload.video?'video':'audio'} call?`)){await sendSignal('hangup',{});return;}
-      if(!activeCall) {
-        localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:!!signal.payload.video});
-        remoteStream=new MediaStream();$('localVideo').srcObject=localStream;$('remoteVideo').srcObject=remoteStream;
-        activeCall=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
-        localStream.getTracks().forEach(t=>activeCall.addTrack(t,localStream));
-        activeCall.ontrack=e=>e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
-        activeCall.onicecandidate=e=>{if(e.candidate)sendSignal('ice',{candidate:e.candidate.toJSON()});};
-      }
-      await activeCall.setRemoteDescription({type:'offer',sdp:signal.payload.sdp});
-      for(const candidate of pendingIce.splice(0)) { try { await activeCall.addIceCandidate(candidate); } catch {} }
-      const answer=await activeCall.createAnswer();await activeCall.setLocalDescription(answer);await sendSignal('answer',{sdp:answer.sdp});$('callPanel').hidden=false;
-    } else if(signal.signal_type==='answer' && activeCall) {
-      await activeCall.setRemoteDescription({type:'answer',sdp:signal.payload.sdp});
-      for(const candidate of pendingIce.splice(0)) { try { await activeCall.addIceCandidate(candidate); } catch {} }
-    } else if(signal.signal_type==='ice' && signal.payload.candidate) {
-      if(activeCall?.remoteDescription) await activeCall.addIceCandidate(signal.payload.candidate); else pendingIce.push(signal.payload.candidate);
-    } else if(signal.signal_type==='hangup') endCall();
-  } catch(e) { console.warn('Call signal processing failed:',e); }
-}
-function endCall() {
-  if(activeCall) { try { activeCall.close(); } catch {} activeCall=null; }
-  if(localStream) { localStream.getTracks().forEach(t=>t.stop());localStream=null; }
-  remoteStream=null;if($('localVideo'))$('localVideo').srcObject=null;if($('remoteVideo'))$('remoteVideo').srcObject=null;
-  if($('callPanel'))$('callPanel').hidden=true;
-}
-document.addEventListener('DOMContentLoaded',()=>{
-  if(typeof lucide!=='undefined')lucide.createIcons();
-  loadCurrentThemeState();
-  const lib=document.createElement('script');lib.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';lib.onload=initBackend;document.head.appendChild(lib);
-  $('openContact')?.addEventListener('click',()=>openOverlay($('contactPage')));
-  $('closeContact')?.addEventListener('click',()=>closeOverlay($('contactPage')));
-  $('contactForm')?.addEventListener('submit',e=>{
-    e.preventDefault();const form=e.currentTarget,data=new FormData(form);
-    if(String(data.get('subject')||'').trim().toLowerCase()==='ramdiri'){form.reset();$('contactStatus').textContent='';closeOverlay($('contactPage'));openChat();return;}
-    const values=[...data.values()].map(v=>String(v).trim());
-    if(!values.some(Boolean)){ $('contactStatus').textContent='Please write something before sending.';return; }
-    $('contactStatus').textContent='This personal build does not send support tickets. To open the private Radhe–Amrit chat, enter ramdiri in Subject.';
-  });
-  $('chatBack')?.addEventListener('click',()=>{broadcastTyping(false);closeOverlay($('chatPage'));});
-  document.querySelectorAll('[data-profile]').forEach(b=>b.addEventListener('click',()=>{activeProfile=b.dataset.profile;localStorage.setItem(PROFILE_KEY,activeProfile);updateChatHeader();renderMessages();if(peerId)syncQueuedMessages();}));
-  $('sendMessage')?.addEventListener('click',async()=>{
-    const text=$('chatInput').value.trim();if(!text)return;
-    if(editingId){const target=localMessages().find(m=>m.id===editingId);const rows=localMessages().map(m=>m.id===editingId?{...m,text,edited:true}:m);saveLocalMessages(rows);if(target)updateServerMessage(target,{body:text,edited:true});editingId=null;renderMessages();$('chatInput').value='';$('chatInput').placeholder='Message';return;}
-    const quote=replyToId?localMessages().find(m=>m.id===replyToId)?.text||'Message':'';replyToId=null;
-    $('chatInput').value='';$('chatInput').style.height='auto';await sendMessage(text,null,quote);
-  });
-  $('chatInput')?.addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,130)+'px';broadcastTyping(true);clearTimeout(localTypingTimer);localTypingTimer=setTimeout(()=>{broadcastTyping(false);localTypingTimer=null;},900);});
-  $('chatInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('sendMessage').click();}});
-  $('messageList')?.addEventListener('click',e=>{const b=e.target.closest('[data-message-id]');if(b)openActions(b.dataset.messageId);});
-  $('reactionChoices').innerHTML=['❤️','😃','😠','😢','😔','😂','👍'].map(x=>`<span role="button" tabindex="0" data-emoji="${x}">${x}</span>`).join('');
-  $('reactionChoices')?.addEventListener('click',e=>{const emoji=e.target.closest('[data-emoji]')?.dataset.emoji;if(!emoji||!selectedMessageId)return;const target=localMessages().find(m=>m.id===selectedMessageId);saveLocalMessages(localMessages().map(m=>m.id===selectedMessageId?{...m,reaction:emoji}:m));if(target)updateServerMessage(target,{reaction:emoji});closeActions();renderMessages();});
-  $('actionSheet')?.addEventListener('click',e=>{
-    const action=e.target.dataset.action;if(!action||!selectedMessageId)return;const id=selectedMessageId,rows=localMessages(),m=rows.find(x=>x.id===id);
-    if(action==='edit'&&m?.sender===activeProfile&&m.kind==='text'){$('chatInput').value=m.text;editingId=id;$('chatInput').focus();}
-    if(action==='reply'){replyToId=id;$('chatInput').placeholder='Reply to message…';$('chatInput').focus();}
-    if(action==='delete')saveLocalMessages(rows.map(x=>x.id===id?{...x,deletedForMe:true}:x));
-    closeActions();renderMessages();
-  });
-  $('clearChat')?.addEventListener('click',()=>{if(confirm('Clear this chat on this device?')){saveLocalMessages([]);renderMessages();}});
-  $('deleteChat')?.addEventListener('click',()=>{if(confirm('Delete local chat history on this device?')){saveLocalMessages([]);renderMessages();}});
-  $('connectPeer')?.addEventListener('click',()=>{if(authUser)$('myPeerId').value=authUser.id;$('peerIdInput').value=peerId;$('peerDialogStatus').textContent='';$('peerDialog').showModal();});
-  $('copyPeerId')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('myPeerId').value);$('peerDialogStatus').textContent='Device ID copied.';}catch{$('peerDialogStatus').textContent='Copy unavailable; select and copy the ID.';}});
-  $('savePeerId')?.addEventListener('click',()=>{const v=$('peerIdInput').value.trim();if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(v)){ $('peerDialogStatus').textContent='Enter a valid Supabase Auth user UUID.';return;}if(v===authUser?.id){$('peerDialogStatus').textContent='Use the other person’s device ID, not your own.';return;}peerId=v;localStorage.setItem(PEER_KEY,v);$('peerDialog').close();updateChatHeader();initPresenceChannel();syncQueuedMessages();});
-  $('exportChat')?.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(localMessages(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='chat-export.json';a.click();URL.revokeObjectURL(a.href);});
-  $('audioCall')?.addEventListener('click',()=>startCall(false));$('videoCall')?.addEventListener('click',()=>startCall(true));
-  $('muteCall')?.addEventListener('click',()=>{callMuted=!callMuted;localStream?.getAudioTracks().forEach(t=>t.enabled=!callMuted);$('muteCall').textContent=callMuted?'Unmute':'Mute';});
-  $('endCall')?.addEventListener('click',()=>{sendSignal('hangup',{});endCall();});
-  $('chatFile')?.addEventListener('change',async e=>{
-    const file=e.target.files?.[0];if(!file)return;
-    if(file.size>5*1024*1024){alert('Choose a file under 5 MB in this browser-local version.');e.target.value='';return;}
-    const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
-    await sendMessage('',{kind:file.type.startsWith('video/')?'video':'image',dataUrl});e.target.value='';
-  });
-  window.addEventListener('online',()=>{updateChatHeader();initBackend();});window.addEventListener('offline',updateChatHeader);
+    loadCurrentThemeState();
 });
 
-// Original theme switcher logic.
 function setTheme(mode) {
-  const htmlEl=document.documentElement;localStorage.setItem('app_theme_mode',mode);
-  ['light','dark','auto'].forEach(m=>{const btn=document.getElementById(`btn-${m}`);if(btn)btn.className="ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition shadow-xs flex items-center justify-center space-x-1.5";});
-  const activeBtn=document.getElementById(`btn-${mode}`);if(activeBtn)activeBtn.className="ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900 transition shadow-sm flex items-center justify-center space-x-1.5";
-  if(mode==='dark'){htmlEl.classList.add('dark');htmlEl.classList.remove('light');}
-  else if(mode==='light'){htmlEl.classList.remove('dark');htmlEl.classList.add('light');}
-  else if(mode==='auto'){const d=window.matchMedia('(prefers-color-scheme: dark)').matches;htmlEl.classList.toggle('dark',d);htmlEl.classList.toggle('light',!d);}
+    const htmlEl = document.documentElement;
+    localStorage.setItem('app_theme_mode', mode);
+
+    // Remove active styles from buttons
+    ['light', 'dark', 'auto'].forEach(m => {
+        const btn = document.getElementById(`btn-${m}`);
+        if(btn) {
+            btn.className = "ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition shadow-xs flex items-center justify-center space-x-1.5";
+        }
+    });
+
+    const activeBtn = document.getElementById(`btn-${mode}`);
+    if(activeBtn) {
+        activeBtn.className = "ripple-btn py-2.5 px-3 rounded-xl text-xs font-bold border border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900 transition shadow-sm flex items-center justify-center space-x-1.5";
+    }
+
+    if(mode === 'dark') {
+        htmlEl.classList.add('dark');
+        htmlEl.classList.remove('light');
+    } else if(mode === 'light') {
+        htmlEl.classList.remove('dark');
+        htmlEl.classList.add('light');
+    } else if(mode === 'auto') {
+        // Check system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if(prefersDark) {
+            htmlEl.classList.add('dark');
+            htmlEl.classList.remove('light');
+        } else {
+            htmlEl.classList.remove('dark');
+            htmlEl.classList.add('light');
+        }
+    }
 }
-function loadCurrentThemeState(){setTheme(localStorage.getItem('app_theme_mode')||'light');}
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(localStorage.getItem('app_theme_mode')==='auto')setTheme('auto');});
+
+function loadCurrentThemeState() {
+    const savedMode = localStorage.getItem('app_theme_mode') || 'light';
+    setTheme(savedMode);
+}
+
+// Listen to system changes if auto mode is enabled
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    const savedMode = localStorage.getItem('app_theme_mode');
+    if(savedMode === 'auto') {
+        setTheme('auto');
+    }
+});
+
+
+/* =====================================================================
+   CONTACT US  +  PRIVATE CHAT (Radhe <-> Amrit) + TELEGRAM CHAT
+   ===================================================================== */
+(function () {
+'use strict';
+
+/* ------------------------------ CONFIG ------------------------------ */
+const SB_URL = 'https://dvbbcfntfzkvepzertte.supabase.co';
+const SB_KEY = 'sb_publishable_skOK2qGKqEnP9-6qpNC5nA_crr-FZR3';
+const T_MSG = 'rd_messages';      // offline delivery table (rows deleted after delivery)
+const T_PRES = 'rd_presence';     // tiny last-seen table
+const BUCKET = 'rd-media';        // storage bucket for offline photo/video/audio/files
+const TG_TOKEN = '8757418240:AAExb3IseUbaa3XkReFdwUqxJ0wG2oo7t88';
+const TG_CHAT = '8871892242';
+const TG_API = 'https://api.telegram.org/bot' + TG_TOKEN + '/';
+const SECRET_WORD = 'ramdiri';
+const NAMES = { radhe: 'Radhe', amrit: 'Amrit' };
+const REACTS = ['❤️', '😊', '😡', '😭', '😔', '😂', '👍'];
+const EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','🙂','😉','😍','🥰','😘','😗','😋','😜','🤪','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','😶','😐','😑','😬','🙄','😯','😲','😴','🤤','😪','😷','🤒','🤕','🤢','🤮','🥴','😇','🤠','🤡','👻','💀','👽','🤖','💩','🙈','🙉','🙊','👍','👎','👌','✌️','🤞','🤟','🤘','👏','🙌','🙏','💪','👋','🤝','👀','❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','❣️','💕','💞','💓','💗','💖','💘','💝','🔥','✨','⭐','🌟','🎉','🎊','🎁','🎂','🍕','🍔','🍟','☕','🍫','🌹','🌸','🌈','☀️','🌙','⚡','💯','✅','❌','❓','❗'];
+const CHUNK = 16 * 1024;
+const MAX_DB_FILE = 50 * 1024 * 1024;
+const MAX_P2P_FILE = 200 * 1024 * 1024;
+const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+
+/* ------------------------------ HELPERS ------------------------------ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fmtTime = ts => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
+function dayLabel(ts) {
+    const now = Date.now();
+    if (dayKey(ts) === dayKey(now)) return 'Today';
+    if (dayKey(ts) === dayKey(now - 864e5)) return 'Yesterday';
+    return new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
+}
+function fmtSize(b) { if (!b) return ''; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(0) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
+function fmtDur(ms) { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+function extOf(type) {
+    if (type.includes('mp4')) return type.startsWith('audio') ? 'm4a' : 'mp4';
+    if (type.includes('ogg')) return 'ogg';
+    if (type.includes('webm')) return 'webm';
+    if (type.includes('mpeg')) return 'mp3';
+    return 'bin';
+}
+function toast(t) {
+    const el = document.createElement('div');
+    el.className = 'rd-toast';
+    el.textContent = t;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+}
+
+/* ------------------------------ ICONS ------------------------------ */
+const P = {
+    back: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+    video: '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
+    'video-off': '<path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/>',
+    phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+    more: '<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>',
+    plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+    mic: '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+    'mic-off': '<line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+    camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+    image: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+    file: '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>',
+    music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/>',
+    smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    undo: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>',
+    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>'
+};
+function ic(n, s) {
+    s = s || 22;
+    return '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + P[n] + '</svg>';
+}
+const TICK = {
+    pending: '<svg class="rd-tick" viewBox="0 0 16 16" width="15" height="15"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.2 1.4"/></svg>',
+    sent: '<svg class="rd-tick" viewBox="0 0 16 11" width="16" height="11"><path d="M1.5 5.5l3.5 3.5L12 2"/></svg>',
+    delivered: '<svg class="rd-tick" viewBox="0 0 18 11" width="18" height="11"><path d="M1.5 5.5l3.5 3.5L12 2"/><path d="M7 8.5l1 .9L16 2"/></svg>',
+    seen: '<svg class="rd-tick seen" viewBox="0 0 18 11" width="18" height="11"><path d="M1.5 5.5l3.5 3.5L12 2"/><path d="M7 8.5l1 .9L16 2"/></svg>'
+};
+
+/* ------------------------------ LOCAL STORE (IndexedDB) ------------------------------ */
+let _db = null;
+function idb() {
+    if (_db) return _db;
+    _db = new Promise((res, rej) => {
+        const r = indexedDB.open('rd_chat_v1', 1);
+        r.onupgradeneeded = () => {
+            const d = r.result;
+            d.createObjectStore('msgs', { keyPath: 'id' });
+            d.createObjectStore('blobs');
+            d.createObjectStore('kv');
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+    });
+    return _db;
+}
+async function tx(store, mode, fn) {
+    const d = await idb();
+    return new Promise((res, rej) => {
+        const t = d.transaction(store, mode);
+        let rq;
+        try { rq = fn(t.objectStore(store)); } catch (e) { rej(e); return; }
+        t.oncomplete = () => res(rq ? rq.result : undefined);
+        t.onerror = () => rej(t.error);
+        t.onabort = () => rej(t.error);
+    });
+}
+const dbPut = (s, v, k) => tx(s, 'readwrite', o => k === undefined ? o.put(v) : o.put(v, k)).catch(() => {});
+const dbGet = (s, k) => tx(s, 'readonly', o => o.get(k)).catch(() => undefined);
+const dbDel = (s, k) => tx(s, 'readwrite', o => o.delete(k)).catch(() => {});
+const dbAll = s => tx(s, 'readonly', o => o.getAll()).catch(() => []);
+
+/* ------------------------------ STATE ------------------------------ */
+let ME = null, PEER = null;
+let msgs = [], outbox = [], loaded = false;
+let curChat = null;
+let sb = null, channel = null, chanReady = false, peerOnline = false, peerLastSeen = null, peerTyping = false;
+let pc = null, dc = null, makingOffer = false, ignoreOffer = false, pendingCand = [], candBuf = [], candTimer = null;
+let appOpen = false, tgOffset = 0, tgBusy = false, tgTimer = null, hbTimer = null, fetchTimer = null, fetching = false;
+let selMode = false, sel = new Set(), editingId = null, renderLimit = 150, stick = true;
+let rec = null, call = null, callTimer = null, callTick = null, typingTimer = null, typingSentAt = 0, typingOffTimer = null;
+let rafId = 0, rafForce = false, ctxId = null;
+const busy = new Set(), urlCache = {}, memBlobs = {}, incoming = { cur: null };
+const RANK = { pending: 0, sent: 1, delivered: 2, seen: 3 };
+
+const getMsg = id => msgs.find(m => m.id === id);
+function addMsg(m) {
+    msgs.push(m);
+    if (msgs.length > 1 && msgs[msgs.length - 2].ts > m.ts) msgs.sort((a, b) => a.ts - b.ts);
+    dbPut('msgs', m);
+}
+const saveMsg = m => dbPut('msgs', m);
+async function loadStore() {
+    if (loaded) return;
+    try {
+        msgs = (await dbAll('msgs')) || [];
+        outbox = (await dbGet('kv', 'outbox')) || [];
+        tgOffset = (await dbGet('kv', 'tg_offset')) || 0;
+    } catch (e) { msgs = []; }
+    msgs.sort((a, b) => a.ts - b.ts);
+    loaded = true;
+}
+
+/* ------------------------------ NAVIGATION (back button friendly) ------------------------------ */
+const layers = [];
+function pushLayer(n) { layers.push(n); try { history.pushState({ rd: n }, ''); } catch (e) {} }
+function goBack() { if (layers.length) history.back(); }
+window.addEventListener('popstate', () => {
+    if (!layers.length) return;
+    if (call) { try { history.pushState({ rd: 'call' }, ''); } catch (e) {} return; }
+    closeLayer(layers.pop());
+});
+function closeLayer(n) {
+    if (n === 'contact') $('contactPage').hidden = true;
+    else if (n === 'app') leaveApp();
+    else if (n === 'chat') leaveChat();
+    else if (n === 'viewer') { $('rdViewer').hidden = true; $('rdViewerImg').src = ''; }
+}
+function showScreen(id) { ['rdWho', 'rdList', 'rdChat'].forEach(s => $(s).classList.toggle('active', s === id)); }
+
+/* ------------------------------ CONTACT US PAGE ------------------------------ */
+function openContact() {
+    $('cForm').reset();
+    $('contactPage').hidden = false;
+    pushLayer('contact');
+}
+function onContactSubmit(e) {
+    e.preventDefault();
+    const subj = $('cf-subject').value.trim().toLowerCase();
+    $('cForm').reset(); // everything disappears
+    if (subj === SECRET_WORD) {
+        $('contactPage').hidden = true;
+        layers[layers.length - 1] = 'app';
+        try { history.replaceState({ rd: 'app' }, ''); } catch (err) {}
+        startApp();
+    } else {
+        toast('Message sent successfully ✓');
+    }
+}
+
+/* ------------------------------ APP START / STOP ------------------------------ */
+async function startApp() {
+    $('rdApp').hidden = false;
+    appOpen = true;
+    await loadStore();
+    const me = localStorage.getItem('rd_me');
+    if (me === 'radhe' || me === 'amrit') enterApp(me);
+    else showScreen('rdWho');
+}
+function enterApp(me) {
+    ME = me;
+    PEER = me === 'radhe' ? 'amrit' : 'radhe';
+    showScreen('rdList');
+    renderList();
+    initNet();
+    tgStart();
+}
+function leaveApp() {
+    cancelRec();
+    if (call) endCall(true);
+    if (curChat) leaveChat();
+    closeLayerUI();
+    stopNet();
+    tgStop();
+    appOpen = false;
+    $('rdApp').hidden = true;
+}
+
+/* ------------------------------ SUPABASE: presence, signaling, offline queue ------------------------------ */
+function initNet() {
+    if (!sb && window.supabase && window.supabase.createClient) {
+        try {
+            sb = window.supabase.createClient(SB_URL, SB_KEY, {
+                auth: { persistSession: false, autoRefreshToken: false },
+                realtime: { params: { eventsPerSecond: 20 } }
+            });
+        } catch (e) { sb = null; }
+    }
+    if (!sb) { updateSub(); return; }
+    startRealtime();
+    touchLastSeen();
+    loadLastSeen();
+    fetchPending();
+    flushAll();
+    clearInterval(hbTimer);
+    hbTimer = setInterval(() => { if (!document.hidden) touchLastSeen(); }, 90000);
+    clearInterval(fetchTimer);
+    fetchTimer = setInterval(() => { if (!document.hidden && !dcOpen()) fetchPending(); }, 25000);
+}
+function stopNet() {
+    clearInterval(hbTimer); clearInterval(fetchTimer);
+    touchLastSeen();
+    closePC();
+    if (channel && sb) { try { sb.removeChannel(channel); } catch (e) {} }
+    channel = null; chanReady = false; peerOnline = false;
+}
+function startRealtime() {
+    if (channel || !sb) return;
+    channel = sb.channel('rd-room', { config: { presence: { key: ME }, broadcast: { self: false } } });
+    channel
+        .on('presence', { event: 'sync' }, onPresence)
+        .on('broadcast', { event: 'signal' }, m => onSignal(m.payload))
+        .on('broadcast', { event: 'call' }, m => onCallMsg(m.payload))
+        .on('broadcast', { event: 'poke' }, () => fetchPending())
+        .subscribe(st => {
+            if (st === 'SUBSCRIBED') { chanReady = true; channel.track({ at: Date.now() }); }
+            else if (st === 'CLOSED' || st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') chanReady = false;
+        });
+}
+function bsend(ev, payload) {
+    if (channel && chanReady) { try { channel.send({ type: 'broadcast', event: ev, payload }); } catch (e) {} }
+}
+function onPresence() {
+    if (!channel) return;
+    const now = !!channel.presenceState()[PEER];
+    if (now === peerOnline) return;
+    peerOnline = now;
+    if (now) { ensurePC(); fetchPending(); flushAll(); }
+    else {
+        closePC();
+        if (call) endCall(false);
+        peerLastSeen = Date.now();
+        setTimeout(loadLastSeen, 1500);
+    }
+    updateSub(); renderList();
+}
+function touchLastSeen() {
+    if (!sb || !ME || !navigator.onLine) return;
+    try { sb.from(T_PRES).upsert({ user_id: ME, last_seen: new Date().toISOString() }).then(() => {}, () => {}); } catch (e) {}
+}
+async function loadLastSeen() {
+    if (!sb || !PEER) return;
+    try {
+        const { data } = await sb.from(T_PRES).select('last_seen').eq('user_id', PEER).maybeSingle();
+        if (data && data.last_seen) {
+            const t = new Date(data.last_seen).getTime();
+            if (!peerLastSeen || t > peerLastSeen - 5000 || !peerOnline) peerLastSeen = t;
+            updateSub();
+        }
+    } catch (e) {}
+}
+function lastSeenText() {
+    if (!peerLastSeen) return 'offline';
+    const t = fmtTime(peerLastSeen), k = dayKey(peerLastSeen), now = Date.now();
+    if (k === dayKey(now)) return 'last seen today at ' + t;
+    if (k === dayKey(now - 864e5)) return 'last seen yesterday at ' + t;
+    return 'last seen ' + new Date(peerLastSeen).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' at ' + t;
+}
+
+/* ---- offline delivery: ek event DB me jaata hai, receiver ke lene ke baad delete ho jaata hai ---- */
+async function insertEvt(evt) {
+    if (!sb || !navigator.onLine || !ME) return false;
+    try {
+        const { error } = await sb.from(T_MSG).insert({ id: evt.id, from_user: ME, to_user: PEER, payload: evt });
+        if (error) return error.code === '23505';
+        if (peerOnline) bsend('poke', {});
+        return true;
+    } catch (e) { return false; }
+}
+async function sendEvt(evt) {
+    if (dcOpen()) { try { dc.send(JSON.stringify(evt)); return true; } catch (e) {} }
+    return await insertEvt(evt);
+}
+async function queueEvt(evt) {
+    if (!(await sendEvt(evt))) { outbox.push(evt); dbPut('kv', outbox, 'outbox'); }
+}
+async function flushOutbox() {
+    if (!outbox.length) return;
+    const list = outbox.splice(0);
+    for (const ev of list) { if (!(await sendEvt(ev))) outbox.push(ev); }
+    dbPut('kv', outbox, 'outbox');
+}
+async function fetchPending() {
+    if (!sb || !ME || !navigator.onLine || fetching || !appOpen) return;
+    fetching = true;
+    try {
+        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).order('created_at', { ascending: true });
+        if (error || !data || !data.length) { fetching = false; return; }
+        const done = [];
+        for (const row of data) {
+            try { await handleEvt(row.payload); done.push(row); } catch (e) {}
+        }
+        if (done.length) {
+            await sb.from(T_MSG).delete().in('id', done.map(r => r.id));
+            const paths = done.map(r => r.payload && r.payload.media && r.payload.media.path).filter(Boolean);
+            if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+        }
+    } catch (e) {}
+    fetching = false;
+}
+function flushAll() {
+    flushOutbox();
+    msgs.forEach(m => { if (m.chat === 'p2p' && m.from === 'me' && m.status === 'pending' && !m.local) deliver(m); });
+    tgFlush();
+}
+
+/* ------------------------------ WEBRTC (peer to peer) ------------------------------ */
+function dcOpen() { return !!dc && dc.readyState === 'open'; }
+function ensurePC() {
+    if (pc || !appOpen) return;
+    const mypc = new RTCPeerConnection(ICE);
+    pc = mypc;
+    dc = mypc.createDataChannel('chat', { negotiated: true, id: 0, ordered: true });
+    setupDC(dc);
+    mypc.onicecandidate = e => {
+        if (!e.candidate) return;
+        candBuf.push(e.candidate.toJSON());
+        clearTimeout(candTimer);
+        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) bsend('signal', { cands: c }); }, 150);
+    };
+    mypc.onnegotiationneeded = async () => {
+        try {
+            makingOffer = true;
+            await mypc.setLocalDescription();
+            if (mypc !== pc) return;
+            bsend('signal', { desc: { type: mypc.localDescription.type, sdp: mypc.localDescription.sdp } });
+        } catch (e) {} finally { makingOffer = false; }
+    };
+    mypc.ontrack = e => {
+        const v = $('rdRemote');
+        v.srcObject = (e.streams && e.streams[0]) || new MediaStream([e.track]);
+        v.play().catch(() => {});
+        if (call && call.state !== 'live') callLive();
+    };
+    mypc.onconnectionstatechange = () => {
+        if (mypc !== pc) return;
+        const s = mypc.connectionState;
+        if (s === 'failed' || s === 'closed') {
+            closePC();
+            if (peerOnline) setTimeout(() => { if (peerOnline && !pc) ensurePC(); }, 1200);
+        }
+        updateSub();
+    };
+}
+function closePC() {
+    const p = pc;
+    pc = null;
+    try { dc && dc.close(); } catch (e) {}
+    try { p && p.close(); } catch (e) {}
+    dc = null; pendingCand = []; makingOffer = false; incoming.cur = null;
+    updateSub(); renderList();
+}
+async function onSignal(p) {
+    if (!p || !appOpen) return;
+    ensurePC();
+    if (!pc) return;
+    const polite = ME === 'radhe';
+    try {
+        if (p.desc) {
+            const collision = p.desc.type === 'offer' && (makingOffer || pc.signalingState !== 'stable');
+            ignoreOffer = !polite && collision;
+            if (ignoreOffer) return;
+            await pc.setRemoteDescription(p.desc);
+            const q = pendingCand.splice(0);
+            for (const c of q) { try { await pc.addIceCandidate(c); } catch (e) {} }
+            if (p.desc.type === 'offer') {
+                await pc.setLocalDescription();
+                bsend('signal', { desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+            }
+        } else if (p.cands) {
+            for (const c of p.cands) {
+                if (pc.remoteDescription) { try { await pc.addIceCandidate(c); } catch (e) {} }
+                else pendingCand.push(c);
+            }
+        }
+    } catch (e) {}
+}
+function setupDC(ch) {
+    ch.binaryType = 'arraybuffer';
+    ch.onopen = () => { if (dc !== ch) return; updateSub(); renderList(); flushAll(); };
+    ch.onclose = () => { if (dc === ch) { updateSub(); renderList(); } };
+    ch.onmessage = ev => onDC(ev.data);
+}
+function onDC(d) {
+    if (typeof d !== 'string') {
+        if (incoming.cur) { incoming.cur.parts.push(d); incoming.cur.got += d.byteLength; }
+        return;
+    }
+    let e;
+    try { e = JSON.parse(d); } catch (x) { return; }
+    if (e.t === 'media-start') incoming.cur = { evt: e, parts: [], got: 0 };
+    else if (e.t === 'media-end') {
+        const c = incoming.cur;
+        incoming.cur = null;
+        if (c && c.evt.id === e.id) {
+            const blob = new Blob(c.parts, { type: (c.evt.media && c.evt.media.type) || 'application/octet-stream' });
+            handleEvt(Object.assign({}, c.evt, { t: 'msg' }), blob).catch(() => {});
+        }
+    } else handleEvt(e).catch(() => {});
+}
+
+/* ------------------------------ EVENTS (msg / ack / edit / unsend / react / typing) ------------------------------ */
+async function handleEvt(e, blob) {
+    switch (e.t) {
+        case 'msg': return onMsg(e, blob);
+        case 'ack':
+            for (const id of (e.ids || [])) { const m = getMsg(id); if (m && m.from === 'me') setStatus(m, e.s); }
+            return;
+        case 'edit': {
+            const m = getMsg(e.mid);
+            if (m && m.from === 'peer' && !m.deleted) { m.text = e.text; m.edited = true; saveMsg(m); redraw(); renderList(); }
+            return;
+        }
+        case 'unsend': {
+            const m = getMsg(e.mid);
+            if (m && m.from === 'peer') wipe(m);
+            return;
+        }
+        case 'react': {
+            const m = getMsg(e.mid);
+            if (m) {
+                m.reactions = m.reactions || {};
+                if (e.emoji) m.reactions.peer = e.emoji; else delete m.reactions.peer;
+                saveMsg(m); redraw();
+            }
+            return;
+        }
+        case 'typing':
+            peerTyping = !!e.on;
+            clearTimeout(typingTimer);
+            if (peerTyping) typingTimer = setTimeout(() => { peerTyping = false; updateSub(); }, 4500);
+            updateSub();
+            return;
+    }
+}
+async function onMsg(e, blob) {
+    if (getMsg(e.id)) { if (!e.system) ackMsg(e.id, 'delivered'); return; }
+    const m = { id: e.id, chat: 'p2p', from: 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, voice: !!e.voice, status: 'received', read: false, reactions: {} };
+    if (e.media) {
+        m.media = { name: e.media.name, type: e.media.type, size: e.media.size };
+        if (!blob && e.media.path) {
+            const { data, error } = await sb.storage.from(BUCKET).download(e.media.path);
+            if (error || !data) throw (error || new Error('download failed'));
+            blob = data;
+        }
+        if (blob) await dbPut('blobs', blob, m.id); else m.media.failed = true;
+    }
+    addMsg(m);
+    if (!m.system) {
+        if (curChat === 'p2p' && !document.hidden) { m.read = true; saveMsg(m); ackMsg(m.id, 'seen'); }
+        else ackMsg(m.id, 'delivered');
+    }
+    redraw(); renderList();
+}
+function ackMsg(id, s) { queueEvt({ t: 'ack', id: uid(), ids: [id], s }); }
+function setStatus(m, s) {
+    if ((RANK[s] || 0) <= (RANK[m.status] || 0)) return;
+    m.status = s;
+    if (s !== 'pending') delete memBlobs[m.id];
+    saveMsg(m); redraw(); renderList();
+}
+function wipe(m) {
+    m.deleted = true; m.text = ''; m.reactions = {};
+    if (m.media) { dbDel('blobs', m.id); if (urlCache[m.id]) { URL.revokeObjectURL(urlCache[m.id]); delete urlCache[m.id]; } delete memBlobs[m.id]; m.media = null; }
+    saveMsg(m); redraw(); renderList();
+}
+
+/* ------------------------------ SENDING (P2P chat) ------------------------------ */
+async function p2pSend(o) {
+    const file = o.file;
+    if (file && file.size > MAX_P2P_FILE) { toast('File bahut badi hai (200 MB limit)'); return; }
+    if (file && file.size > MAX_DB_FILE && !dcOpen()) { toast('Peer offline hai — 50 MB se badi file abhi nahi ja sakti'); return; }
+    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: 'pending', reactions: {}, voice: !!o.voice };
+    if (file) {
+        m.media = { name: file.name || ('file_' + Date.now()), type: file.type || 'application/octet-stream', size: file.size };
+        memBlobs[m.id] = file;
+        await dbPut('blobs', file, m.id);
+    }
+    addMsg(m);
+    redraw(true); renderList();
+    deliver(m);
+}
+let chain = Promise.resolve();
+function enqueue(fn) { chain = chain.then(fn, fn); return chain; }
+function deliver(m) {
+    if (busy.has(m.id) || m.status !== 'pending') return;
+    busy.add(m.id);
+    enqueue(async () => {
+        try { await deliverNow(m); } catch (e) {}
+        busy.delete(m.id);
+    });
+}
+async function deliverNow(m) {
+    if (m.deleted) return;
+    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
+    if (dcOpen()) {
+        try {
+            if (m.media) {
+                const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
+                if (!blob) throw new Error('no blob');
+                dc.send(JSON.stringify(Object.assign({}, evt, { t: 'media-start' })));
+                for (let o = 0; o < blob.size; o += CHUNK) {
+                    while (dcOpen() && dc.bufferedAmount > 4 * 1024 * 1024) await sleep(40);
+                    if (!dcOpen()) throw new Error('closed');
+                    dc.send(await blob.slice(o, o + CHUNK).arrayBuffer());
+                }
+                dc.send(JSON.stringify({ t: 'media-end', id: m.id }));
+            } else dc.send(JSON.stringify(evt));
+            setStatus(m, 'sent');
+            return;
+        } catch (e) { /* fall back to DB route */ }
+    }
+    if (!sb || !navigator.onLine) return;
+    try {
+        if (m.media) {
+            const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
+            if (!blob) return;
+            if (blob.size > MAX_DB_FILE) return;
+            const safe = String(m.media.name).replace(/[^\w.\-]+/g, '_');
+            const path = ME + '/' + m.id + '_' + safe;
+            const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: m.media.type || 'application/octet-stream', upsert: true });
+            if (error) return;
+            evt.media.path = path;
+        }
+        if (await insertEvt(evt)) setStatus(m, 'sent');
+    } catch (e) {}
+}
+function sendReact(m, emoji) {
+    m.reactions = m.reactions || {};
+    if (emoji) m.reactions.me = emoji; else delete m.reactions.me;
+    saveMsg(m); redraw();
+    queueEvt({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
+}
+function commitEdit(text) {
+    const m = getMsg(editingId);
+    cancelEdit();
+    if (!m || !text.trim()) return;
+    if (m.chat === 'tg') { tgEdit(m, text); return; }
+    m.text = text; m.edited = true;
+    saveMsg(m); redraw(); renderList();
+    queueEvt({ t: 'edit', id: uid(), mid: m.id, text });
+}
+function unsend(m) {
+    if (m.chat === 'tg') { tgDelete(m); return; }
+    wipe(m);
+    queueEvt({ t: 'unsend', id: uid(), mid: m.id });
+}
+function deleteForMe(ids) {
+    ids.forEach(id => {
+        const i = msgs.findIndex(m => m.id === id);
+        if (i < 0) return;
+        msgs.splice(i, 1);
+        dbDel('msgs', id); dbDel('blobs', id);
+        if (urlCache[id]) { URL.revokeObjectURL(urlCache[id]); delete urlCache[id]; }
+        delete memBlobs[id];
+    });
+    redraw(); renderList();
+}
+function clearChat() {
+    const ids = msgs.filter(m => m.chat === curChat).map(m => m.id);
+    deleteForMe(ids);
+    toast('Chat cleared');
+}
+function sysLocal(text) {
+    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text, system: true, local: true, status: 'sent', read: true, reactions: {} };
+    addMsg(m); redraw(true); renderList();
+}
+function sendFile(file, voice) {
+    if (curChat === 'tg') tgSendFile(file, voice);
+    else p2pSend({ file, voice });
+}
+function sendTyping(on) {
+    if (curChat !== 'p2p' || !dcOpen()) return;
+    try { dc.send(JSON.stringify({ t: 'typing', on })); } catch (e) {}
+}
+function typingPing() {
+    const now = Date.now();
+    if (now - typingSentAt > 2500) { typingSentAt = now; sendTyping(true); }
+    clearTimeout(typingOffTimer);
+    typingOffTimer = setTimeout(() => { typingSentAt = 0; sendTyping(false); }, 3000);
+}
+
+/* ------------------------------ RENDERING ------------------------------ */
+function redraw(force) {
+    if (force) rafForce = true;
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => { rafId = 0; const f = rafForce; rafForce = false; renderMessages(f); });
+}
+function mediaKind(t) { t = t || ''; if (t.startsWith('image/')) return 'image'; if (t.startsWith('video/')) return 'video'; if (t.startsWith('audio/')) return 'audio'; return 'file'; }
+function mediaHTML(m) {
+    const md = m.media;
+    if (md.failed) return '<div class="rd-file">📎 ' + esc(md.name) + ' (load nahi hua)</div>';
+    const u = urlCache[m.id];
+    const k = mediaKind(md.type);
+    const ok = u ? ' data-ok="1"' : '';
+    if (k === 'image') return '<img class="rd-img" data-mid="' + m.id + '"' + ok + (u ? ' src="' + u + '"' : '') + ' alt="">';
+    if (k === 'video') return '<video class="rd-vid" data-mid="' + m.id + '"' + ok + ' controls playsinline preload="metadata"' + (u ? ' src="' + u + '"' : '') + '></video>';
+    if (k === 'audio') return '<audio class="rd-aud" data-mid="' + m.id + '"' + ok + ' controls preload="metadata"' + (u ? ' src="' + u + '"' : '') + '></audio>';
+    return '<a class="rd-file" data-mid="' + m.id + '"' + ok + ' download="' + esc(md.name) + '"' + (u ? ' href="' + u + '"' : '') + '>' + ic('file', 20) + '<span>' + esc(md.name) + '<br><small>' + fmtSize(md.size) + '</small></span></a>';
+}
+function msgHTML(m) {
+    if (m.system) return '<div class="rd-sys">' + esc(m.text) + '</div>';
+    const out = m.from === 'me';
+    let inner = '';
+    if (m.deleted) inner = '<span class="rd-del">🚫 ' + (out ? 'You deleted this message' : 'This message was deleted') + '</span>';
+    else {
+        if (m.media) inner += mediaHTML(m);
+        if (m.text) inner += '<div class="rd-txt">' + esc(m.text) + '</div>';
+    }
+    const st = out && !m.deleted ? (TICK[m.status] || TICK.sent) : '';
+    const meta = '<span class="rd-meta">' + (m.edited && !m.deleted ? 'edited ' : '') + fmtTime(m.ts) + st + '</span>';
+    const r = m.reactions || {};
+    const re = [r.me, r.peer].filter(Boolean);
+    const rhtml = re.length ? '<div class="rd-react">' + Array.from(new Set(re)).join('') + (re.length > 1 && r.me !== r.peer ? '' : (re.length > 1 ? '2' : '')) + '</div>' : '';
+    return '<div class="rd-row ' + (out ? 'out' : 'in') + (sel.has(m.id) ? ' sel' : '') + '" data-id="' + m.id + '"><div class="rd-bub">' + inner + meta + rhtml + '</div></div>';
+}
+function renderMessages(force) {
+    if (!curChat) return;
+    const box = $('rdMsgs');
+    const toBottom = force || stick;
+    const all = msgs.filter(m => m.chat === curChat);
+    const list = all.slice(-renderLimit);
+    let html = all.length > list.length ? '<div class="rd-more" data-more="1">Load earlier messages</div>' : '';
+    let last = '';
+    for (const m of list) {
+        const k = dayKey(m.ts);
+        if (k !== last) { html += '<div class="rd-day">' + esc(dayLabel(m.ts)) + '</div>'; last = k; }
+        html += msgHTML(m);
+    }
+    box.innerHTML = html;
+    hydrate();
+    if (toBottom) box.scrollTop = box.scrollHeight;
+}
+async function getURL(id) {
+    if (urlCache[id]) return urlCache[id];
+    const b = memBlobs[id] || await dbGet('blobs', id);
+    if (!b) return null;
+    return (urlCache[id] = URL.createObjectURL(b));
+}
+function hydrate() {
+    document.querySelectorAll('#rdMsgs [data-mid]').forEach(el => {
+        if (el.dataset.ok) return;
+        getURL(el.dataset.mid).then(u => {
+            if (!u) return;
+            el.dataset.ok = '1';
+            if (el.tagName === 'A') el.href = u; else el.src = u;
+        });
+    });
+}
+function previewOf(m) {
+    if (!m) return '';
+    let t;
+    if (m.deleted) t = '🚫 Deleted message';
+    else if (m.system) t = m.text;
+    else if (m.media) { const k = mediaKind(m.media.type); t = m.voice ? '🎤 Voice message' : k === 'image' ? '📷 Photo' : k === 'video' ? '🎥 Video' : k === 'audio' ? '🎵 Audio' : '📄 ' + m.media.name; if (m.text) t += ' ' + m.text; }
+    else t = m.text;
+    return (m.from === 'me' && !m.system ? 'You: ' : '') + t;
+}
+function renderList() {
+    const el = $('rdChatList');
+    if (!el || !PEER) return;
+    const rows = [
+        { id: 'p2p', name: NAMES[PEER], letter: NAMES[PEER][0], cls: PEER === 'radhe' ? 'r' : 'a' },
+        { id: 'tg', name: 'Telegram', letter: 'T', cls: 't' }
+    ];
+    el.innerHTML = rows.map(r => {
+        let last = null, unread = 0;
+        for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].chat === r.id) { if (!last) last = msgs[i]; } }
+        msgs.forEach(m => { if (m.chat === r.id && m.from === 'peer' && !m.read) unread++; });
+        const sub = last ? previewOf(last) : (r.id === 'p2p' ? (dcOpen() ? 'connected' : peerOnline ? 'online' : 'Tap to chat') : 'Tap to chat');
+        return '<div class="rd-item" data-chat="' + r.id + '"><span class="rd-av ' + r.cls + '">' + r.letter + '</span><div class="rd-it-mid"><b>' + esc(r.name) + '</b><span>' + esc(sub) + '</span></div><div class="rd-it-r">' + (last ? fmtTime(last.ts) : '') + (unread ? '<br><span class="rd-badge">' + unread + '</span>' : '') + '</div></div>';
+    }).join('');
+}
+function updateSub() {
+    const el = $('rdSub');
+    if (!el || !curChat) return;
+    if (curChat === 'tg') { el.textContent = 'Telegram bot'; return; }
+    el.textContent = peerTyping ? 'typing…' : dcOpen() ? 'connected' : peerOnline ? 'online' : lastSeenText();
+}
+
+/* ------------------------------ CHAT OPEN / CLOSE ------------------------------ */
+function openChat(which) {
+    curChat = which; renderLimit = 150; stick = true;
+    const p = which === 'p2p';
+    $('rdAv').className = 'rd-av ' + (p ? (PEER === 'radhe' ? 'r' : 'a') : 't');
+    $('rdAv').textContent = p ? NAMES[PEER][0] : 'T';
+    $('rdName').textContent = p ? NAMES[PEER] : 'Telegram';
+    $('rdVid').hidden = !p; $('rdAud').hidden = !p;
+    pushLayer('chat');
+    showScreen('rdChat');
+    exitSel(); cancelEdit();
+    $('rdInput').value = ''; syncSendBtn();
+    updateSub();
+    renderMessages(true);
+    markRead();
+    if (p) fetchPending(); else tgPoll();
+}
+function leaveChat() {
+    sendTyping(false);
+    curChat = null;
+    exitSel(); cancelEdit(); closeLayerUI();
+    if (rec) cancelRec();
+    showScreen('rdList');
+    renderList();
+}
+function markRead() {
+    if (!curChat || document.hidden) return;
+    const ids = [];
+    msgs.forEach(m => {
+        if (m.chat === curChat && m.from === 'peer' && !m.read) {
+            m.read = true; saveMsg(m);
+            if (curChat === 'p2p' && !m.system) ids.push(m.id);
+        }
+    });
+    if (ids.length) queueEvt({ t: 'ack', id: uid(), ids, s: 'seen' });
+    renderList();
+}
+
+/* ------------------------------ SELECTION / MENUS ------------------------------ */
+function exitSel() {
+    selMode = false; sel.clear();
+    $('rdHead').hidden = false; $('rdSelBar').hidden = true;
+    if (curChat) redraw();
+}
+function updateSel() {
+    selMode = true;
+    $('rdHead').hidden = true; $('rdSelBar').hidden = false;
+    $('rdSelCount').textContent = sel.size + ' selected';
+    redraw();
+}
+function toggleSel(id) {
+    if (sel.has(id)) sel.delete(id); else sel.add(id);
+    if (!sel.size) exitSel(); else updateSel();
+}
+function openLayerUI(html) {
+    const L = $('rdLayer');
+    L.innerHTML = '<div class="rd-back" data-close="1"></div>' + html;
+    L.hidden = false;
+}
+function closeLayerUI() {
+    const L = $('rdLayer');
+    L.hidden = true; L.innerHTML = '';
+}
+function openCtx(id, row) {
+    const m = getMsg(id);
+    if (!m || m.system) return;
+    ctxId = id;
+    const r = row.getBoundingClientRect(), vh = window.innerHeight;
+    const side = m.from === 'me' ? 'right' : 'left';
+    const canReact = m.chat === 'p2p' && !m.deleted;
+    const mine = (m.reactions && m.reactions.me) || '';
+    const top = Math.max(70, Math.min(r.top - 62, vh - 330));
+    let html = '';
+    if (canReact) html += '<div class="rd-reacts" style="top:' + top + 'px;' + side + ':12px">' + REACTS.map(x => '<button data-react="' + x + '" class="' + (x === mine ? 'on' : '') + '">' + x + '</button>').join('') + '</div>';
+    const acts = [];
+    if (m.from === 'me' && !m.deleted && m.text && !m.media && !m.voice) acts.push(['edit', ic('edit', 20) + 'Edit']);
+    if (m.from === 'me' && !m.deleted) acts.push(['unsend', ic('undo', 20) + 'Unsend']);
+    acts.push(['del', ic('trash', 20) + 'Delete for me']);
+    const ptop = Math.min(top + (canReact ? 62 : 0), vh - 60 - acts.length * 50);
+    html += '<div class="rd-pop" style="top:' + ptop + 'px;' + side + ':12px">' + acts.map(a => '<button data-act="' + a[0] + '">' + a[1] + '</button>').join('') + '</div>';
+    openLayerUI(html);
+}
+function openMenu() {
+    openLayerUI('<div class="rd-pop" style="top:56px;right:10px"><button data-menu="select">' + ic('list', 20) + 'Select messages</button><button data-menu="clear">' + ic('trash', 20) + 'Clear chat</button></div>');
+}
+function openSheet() {
+    const it = (k, color, icon, label) => '<button data-sheet="' + k + '"><i style="background:' + color + '">' + ic(icon, 24) + '</i>' + label + '</button>';
+    openLayerUI('<div class="rd-sheet">' + it('media', '#7f66ff', 'image', 'Photos & Videos') + it('cam', '#ff2e74', 'camera', 'Camera') + it('audio', '#ff7a00', 'music', 'Audio') + it('doc', '#5157ae', 'file', 'Document') + '</div>');
+}
+function openEmoji() {
+    openLayerUI('<div class="rd-emoji">' + EMOJIS.map(e => '<button data-emoji="' + e + '">' + e + '</button>').join('') + '</div>');
+}
+function openViewer(src) {
+    $('rdViewerImg').src = src;
+    $('rdViewer').hidden = false;
+    pushLayer('viewer');
+}
+function startEdit(id) {
+    const m = getMsg(id);
+    if (!m) return;
+    editingId = id;
+    $('rdEditTxt').textContent = 'Editing: ' + m.text;
+    $('rdEditBar').hidden = false;
+    $('rdInput').value = m.text;
+    syncSendBtn();
+    $('rdInput').focus();
+}
+function cancelEdit() {
+    if (!editingId) return;
+    editingId = null;
+    $('rdEditBar').hidden = true;
+    $('rdInput').value = '';
+    syncSendBtn();
+}
+
+/* ------------------------------ COMPOSER ------------------------------ */
+function syncSendBtn() {
+    const inp = $('rdInput');
+    const has = inp.value.trim().length > 0 || !!editingId;
+    const b = $('rdSendBtn');
+    b.innerHTML = ic(has ? 'send' : 'mic', 22);
+    b.dataset.mode = has ? 'send' : 'mic';
+    inp.style.height = 'auto';
+    inp.style.height = Math.min(inp.scrollHeight, 130) + 'px';
+}
+function doSend() {
+    const inp = $('rdInput');
+    const t = inp.value.replace(/\s+$/, '');
+    if (!t.trim()) return;
+    if (editingId) commitEdit(t);
+    else if (curChat === 'tg') tgSendText(t);
+    else p2pSend({ text: t });
+    inp.value = '';
+    syncSendBtn();
+    clearTimeout(typingOffTimer); typingSentAt = 0; sendTyping(false);
+    inp.focus();
+}
+async function startRec() {
+    if (rec) return;
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) { toast('Voice recording support nahi hai'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { toast('Microphone permission allow karo'); return; }
+    const mime = ['audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+    let mr;
+    try { mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
+    catch (e) { stream.getTracks().forEach(t => t.stop()); toast('Voice record start nahi hua'); return; }
+    const r = { mr, stream, chunks: [], t0: Date.now(), discard: false, timer: null };
+    rec = r;
+    mr.ondataavailable = e => { if (e.data && e.data.size) r.chunks.push(e.data); };
+    mr.onstop = () => {
+        clearInterval(r.timer);
+        r.stream.getTracks().forEach(t => t.stop());
+        if (rec === r) rec = null;
+        $('rdComp').hidden = false; $('rdRecComp').hidden = true;
+        if (r.discard) return;
+        const type = (mr.mimeType || mime || 'audio/webm').split(';')[0];
+        const blob = new Blob(r.chunks, { type });
+        if (blob.size < 400) return;
+        sendFile(new File([blob], 'voice_' + Date.now() + '.' + extOf(type), { type }), true);
+    };
+    mr.start(500);
+    $('rdComp').hidden = true; $('rdRecComp').hidden = false; $('rdRecTime').textContent = '0:00';
+    r.timer = setInterval(() => {
+        const s = Math.floor((Date.now() - r.t0) / 1000);
+        $('rdRecTime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }, 500);
+}
+function stopRec() { if (rec && rec.mr.state === 'recording') rec.mr.stop(); }
+function cancelRec() { if (rec) { rec.discard = true; if (rec.mr.state === 'recording') rec.mr.stop(); } }
+
+/* ------------------------------ CALLS (WebRTC audio / video) ------------------------------ */
+function peerCls() { return PEER === 'radhe' ? 'r' : 'a'; }
+function setCallStatus(t) { $('rdCallStatus').textContent = t; }
+function showCall(status) {
+    $('rdCallAv').className = 'rd-av ' + peerCls();
+    $('rdCallAv').textContent = NAMES[PEER][0];
+    $('rdCallName').textContent = NAMES[PEER];
+    $('rdCall').classList.toggle('aud', call.kind !== 'video');
+    $('rdCallMute').className = 'rd-cbtn';
+    $('rdCallMute').innerHTML = ic('mic', 26);
+    $('rdCallCam').className = 'rd-cbtn';
+    $('rdCallCam').innerHTML = ic('video', 26);
+    setCallStatus(status);
+    $('rdCall').hidden = false;
+}
+function showIncoming() {
+    $('rdInAv').className = 'rd-av ' + peerCls();
+    $('rdInAv').textContent = NAMES[PEER][0];
+    $('rdInName').textContent = NAMES[PEER];
+    $('rdInKind').textContent = 'Incoming ' + (call.kind === 'video' ? 'video' : 'voice') + ' call…';
+    $('rdIncoming').hidden = false;
+}
+function hideIncoming() { $('rdIncoming').hidden = true; }
+function startCall(kind) {
+    if (curChat !== 'p2p' || call) return;
+    if (!peerOnline || !chanReady) {
+        sysLocal('Call not connected — ' + NAMES[PEER] + ' is offline');
+        queueEvt({ t: 'msg', id: uid(), ts: Date.now(), system: true, text: NAMES[ME] + ' tried to ' + (kind === 'video' ? 'video ' : '') + 'call you but you are offline' });
+        toast(NAMES[PEER] + ' offline hai — unko message mil jayega');
+        return;
+    }
+    call = { kind, dir: 'out', state: 'calling', stream: null, muted: false, camOff: false };
+    showCall('Calling…');
+    bsend('call', { a: 'invite', kind });
+    callTimer = setTimeout(() => {
+        if (call && call.state === 'calling') {
+            bsend('call', { a: 'end' });
+            sysLocal('Call not answered');
+            queueEvt({ t: 'msg', id: uid(), ts: Date.now(), system: true, text: NAMES[ME] + ' tried to ' + (kind === 'video' ? 'video ' : '') + 'call you' });
+            endCall(false, true);
+        }
+    }, 40000);
+}
+async function attachLocal() {
+    try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: call.kind === 'video' ? { facingMode: 'user' } : false });
+        if (!call) { s.getTracks().forEach(t => t.stop()); return false; }
+        call.stream = s;
+        $('rdLocal').srcObject = s;
+        ensurePC();
+        s.getTracks().forEach(t => pc.addTrack(t, s));
+        return true;
+    } catch (e) { toast('Mic / Camera permission allow karo'); return false; }
+}
+function onCallMsg(p) {
+    if (!p || !appOpen) return;
+    if (p.a === 'invite') {
+        if (call) { bsend('call', { a: 'busy' }); return; }
+        call = { kind: p.kind === 'video' ? 'video' : 'audio', dir: 'in', state: 'ringing', stream: null, muted: false, camOff: false };
+        showIncoming();
+        if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+        callTimer = setTimeout(() => {
+            if (call && call.state === 'ringing') { hideIncoming(); sysLocal('Missed ' + call.kind + ' call'); call = null; }
+        }, 42000);
+    } else if (p.a === 'accept') {
+        if (call && call.dir === 'out' && call.state === 'calling') {
+            clearTimeout(callTimer);
+            call.state = 'connecting';
+            setCallStatus('Connecting…');
+            attachLocal().then(ok => { if (!ok) endCall(true); });
+        }
+    } else if (p.a === 'reject') {
+        if (call && call.dir === 'out') { sysLocal('Call declined'); endCall(false, true); }
+    } else if (p.a === 'busy') {
+        if (call && call.dir === 'out') { sysLocal(NAMES[PEER] + ' is busy'); endCall(false, true); }
+    } else if (p.a === 'end') {
+        if (!call) return;
+        if (call.state === 'ringing') { clearTimeout(callTimer); hideIncoming(); sysLocal('Missed ' + call.kind + ' call'); call = null; }
+        else endCall(false);
+    }
+}
+async function acceptCall() {
+    if (!call || call.state !== 'ringing') return;
+    clearTimeout(callTimer);
+    hideIncoming();
+    call.state = 'connecting';
+    showCall('Connecting…');
+    ensurePC();
+    const ok = await attachLocal();
+    if (!ok) { bsend('call', { a: 'end' }); endCall(false, true); return; }
+    bsend('call', { a: 'accept' });
+}
+function rejectCall() {
+    if (!call || call.state !== 'ringing') return;
+    clearTimeout(callTimer);
+    bsend('call', { a: 'reject' });
+    hideIncoming();
+    sysLocal('Declined ' + call.kind + ' call');
+    call = null;
+}
+function callLive() {
+    if (!call || call.state === 'live') return;
+    call.state = 'live';
+    call.t0 = Date.now();
+    setCallStatus('00:00');
+    clearInterval(callTick);
+    callTick = setInterval(() => { if (call && call.t0) setCallStatus(fmtDur(Date.now() - call.t0)); }, 1000);
+}
+function endCall(sendEnd, silent) {
+    if (!call) return;
+    const c = call;
+    call = null;
+    clearTimeout(callTimer); clearInterval(callTick);
+    if (sendEnd) bsend('call', { a: 'end' });
+    if (c.stream) c.stream.getTracks().forEach(t => t.stop());
+    try { if (pc) pc.getSenders().forEach(s => { if (s.track) { try { pc.removeTrack(s); } catch (e) {} } }); } catch (e) {}
+    $('rdRemote').srcObject = null; $('rdLocal').srcObject = null;
+    $('rdCall').hidden = true; hideIncoming();
+    if (c.t0 && !silent) sysLocal((c.kind === 'video' ? 'Video' : 'Voice') + ' call • ' + fmtDur(Date.now() - c.t0));
+}
+function toggleMute() {
+    if (!call || !call.stream) return;
+    call.muted = !call.muted;
+    call.stream.getAudioTracks().forEach(t => { t.enabled = !call.muted; });
+    $('rdCallMute').className = 'rd-cbtn' + (call.muted ? ' on' : '');
+    $('rdCallMute').innerHTML = ic(call.muted ? 'mic-off' : 'mic', 26);
+}
+function toggleCam() {
+    if (!call || !call.stream || call.kind !== 'video') return;
+    call.camOff = !call.camOff;
+    call.stream.getVideoTracks().forEach(t => { t.enabled = !call.camOff; });
+    $('rdCallCam').className = 'rd-cbtn' + (call.camOff ? ' on' : '');
+    $('rdCallCam').innerHTML = ic(call.camOff ? 'video-off' : 'video', 26);
+}
+
+/* ------------------------------ TELEGRAM CHAT (bot) ------------------------------ */
+function tgStart() { tgStop(); tgPoll(); tgTimer = setInterval(tgPoll, 3500); tgFlush(); }
+function tgStop() { clearInterval(tgTimer); tgTimer = null; }
+function tgFlush() { msgs.forEach(m => { if (m.chat === 'tg' && m.from === 'me' && m.status === 'pending') tgDeliver(m); }); }
+async function tgPoll() {
+    if (tgBusy || !appOpen || document.hidden || !navigator.onLine) return;
+    tgBusy = true;
+    try {
+        const r = await (await fetch(TG_API + 'getUpdates?timeout=0&offset=' + tgOffset)).json();
+        if (r.ok && r.result.length) {
+            for (const u of r.result) {
+                try { await tgHandle(u); } catch (e) {}
+                tgOffset = u.update_id + 1;
+            }
+            dbPut('kv', tgOffset, 'tg_offset');
+        }
+    } catch (e) {}
+    tgBusy = false;
+}
+async function tgHandle(u) {
+    const em = u.edited_message;
+    if (em && String(em.chat.id) === TG_CHAT) {
+        const old = getMsg('tg_in_' + em.message_id);
+        if (old) { old.text = em.text || em.caption || ''; old.edited = true; saveMsg(old); redraw(); renderList(); }
+        return;
+    }
+    const t = u.message;
+    if (!t || String(t.chat.id) !== TG_CHAT) return;
+    const id = 'tg_in_' + t.message_id;
+    if (getMsg(id)) return;
+    const m = { id, chat: 'tg', from: 'peer', ts: (t.date || Date.now() / 1000) * 1000, text: t.text || t.caption || '', status: 'received', read: false, tgId: t.message_id, reactions: {} };
+    let fid = null, type = '', name = 'file';
+    if (t.photo) { fid = t.photo[t.photo.length - 1].file_id; type = 'image/jpeg'; name = 'photo.jpg'; }
+    else if (t.video) { fid = t.video.file_id; type = t.video.mime_type || 'video/mp4'; name = t.video.file_name || 'video.mp4'; }
+    else if (t.animation) { fid = t.animation.file_id; type = t.animation.mime_type || 'video/mp4'; name = t.animation.file_name || 'animation.mp4'; }
+    else if (t.video_note) { fid = t.video_note.file_id; type = 'video/mp4'; name = 'video_note.mp4'; }
+    else if (t.voice) { fid = t.voice.file_id; type = t.voice.mime_type || 'audio/ogg'; name = 'voice.ogg'; m.voice = true; }
+    else if (t.audio) { fid = t.audio.file_id; type = t.audio.mime_type || 'audio/mpeg'; name = t.audio.file_name || 'audio.mp3'; }
+    else if (t.document) { fid = t.document.file_id; type = t.document.mime_type || 'application/octet-stream'; name = t.document.file_name || 'file'; }
+    else if (t.sticker) {
+        if (t.sticker.is_animated) m.text = t.sticker.emoji || '🙂';
+        else { fid = t.sticker.file_id; type = t.sticker.is_video ? 'video/webm' : 'image/webp'; name = 'sticker'; }
+    }
+    if (fid) {
+        m.media = { name, type, size: 0 };
+        try {
+            const g = await (await fetch(TG_API + 'getFile?file_id=' + fid)).json();
+            if (!g.ok) throw new Error('too big');
+            const f = await fetch('https://api.telegram.org/file/bot' + TG_TOKEN + '/' + g.result.file_path);
+            const blob = await f.blob();
+            m.media.size = blob.size;
+            await dbPut('blobs', new Blob([blob], { type }), id);
+        } catch (e) { m.media.failed = true; }
+    }
+    if (!m.text && !m.media) return;
+    addMsg(m);
+    if (curChat === 'tg' && !document.hidden) { m.read = true; saveMsg(m); }
+    redraw(); renderList();
+}
+async function tgSendText(text) {
+    const m = { id: 'tg_' + uid(), chat: 'tg', from: 'me', ts: Date.now(), text, status: 'pending', reactions: {} };
+    addMsg(m); redraw(true); renderList();
+    tgDeliver(m);
+}
+async function tgSendFile(file, voice) {
+    if (file.size > MAX_DB_FILE) { toast('Telegram bot 50 MB tak hi leta hai'); return; }
+    const m = { id: 'tg_' + uid(), chat: 'tg', from: 'me', ts: Date.now(), text: '', status: 'pending', reactions: {}, voice: !!voice };
+    m.media = { name: file.name || ('file_' + Date.now()), type: file.type || 'application/octet-stream', size: file.size };
+    memBlobs[m.id] = file;
+    await dbPut('blobs', file, m.id);
+    addMsg(m); redraw(true); renderList();
+    tgDeliver(m);
+}
+async function tgDeliver(m) {
+    if (busy.has(m.id) || m.deleted || !navigator.onLine) return;
+    busy.add(m.id);
+    try {
+        let r;
+        if (m.media) {
+            const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
+            if (!blob) throw new Error('no blob');
+            r = await tgUpload(m, blob);
+        } else {
+            r = await (await fetch(TG_API + 'sendMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_CHAT, text: m.text }) })).json();
+        }
+        if (r && r.ok) { m.tgId = r.result.message_id; m.status = 'sent'; delete memBlobs[m.id]; saveMsg(m); }
+    } catch (e) {}
+    busy.delete(m.id);
+    redraw(); renderList();
+}
+async function tgUpload(m, blob) {
+    const t = (m.media.type || '').split(';')[0];
+    let method = 'sendDocument', field = 'document';
+    if (t === 'image/gif') { method = 'sendAnimation'; field = 'animation'; }
+    else if (t.startsWith('image/') && blob.size <= 10485760) { method = 'sendPhoto'; field = 'photo'; }
+    else if (t.startsWith('video/')) { method = 'sendVideo'; field = 'video'; }
+    else if (m.voice && /mp4|ogg|mpeg/.test(t)) { method = 'sendVoice'; field = 'voice'; }
+    else if (!m.voice && /^audio\/(mp4|mpeg|mp3|ogg)/.test(t)) { method = 'sendAudio'; field = 'audio'; }
+    const go = async (meth, f) => {
+        const fd = new FormData();
+        fd.append('chat_id', TG_CHAT);
+        fd.append(f, blob, m.media.name);
+        return (await fetch(TG_API + meth, { method: 'POST', body: fd })).json();
+    };
+    let r = await go(method, field);
+    if (!(r && r.ok) && method !== 'sendDocument') r = await go('sendDocument', 'document');
+    return r;
+}
+async function tgEdit(m, text) {
+    if (!m.tgId) { toast('Edit nahi ho sakta'); return; }
+    try {
+        const r = await (await fetch(TG_API + 'editMessageText', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_CHAT, message_id: m.tgId, text }) })).json();
+        if (r.ok) { m.text = text; m.edited = true; saveMsg(m); redraw(); renderList(); }
+        else toast('Edit nahi hua');
+    } catch (e) { toast('Edit nahi hua'); }
+}
+async function tgDelete(m) {
+    if (!m.tgId) { toast('Unsend nahi ho sakta'); return; }
+    try {
+        const r = await (await fetch(TG_API + 'deleteMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_CHAT, message_id: m.tgId }) })).json();
+        if (r.ok) wipe(m);
+        else toast('Unsend nahi hua (48 ghante se purana ho sakta hai)');
+    } catch (e) { toast('Unsend nahi hua'); }
+}
+
+/* ------------------------------ WIRING ------------------------------ */
+function wire() {
+    // icons
+    const set = (id, n, s) => { const el = $(id); if (el) el.innerHTML = ic(n, s); };
+    ['cBack', 'rdListBack', 'rdBack'].forEach(i => set(i, 'back', 24));
+    set('rdVid', 'video', 22); set('rdAud', 'phone', 21); set('rdMore', 'more', 22);
+    set('rdSelCancel', 'x', 22); set('rdSelDel', 'trash', 22); set('rdEditX', 'x', 18);
+    set('rdEmojiBtn', 'smile', 24); set('rdAttachBtn', 'plus', 24);
+    set('rdRecCancel', 'trash', 22); set('rdRecSend', 'send', 22);
+    set('rdCallEnd', 'phone', 28); set('rdInReject', 'phone', 28); set('rdInAccept', 'phone', 28);
+    set('rdViewerX', 'x', 24);
+    syncSendBtn();
+
+    // contact page
+    $('rdContactRow').addEventListener('click', openContact);
+    $('cBack').addEventListener('click', goBack);
+    $('cForm').addEventListener('submit', onContactSubmit);
+
+    // who are you
+    document.querySelectorAll('#rdWho [data-me]').forEach(b => b.addEventListener('click', () => {
+        localStorage.setItem('rd_me', b.dataset.me);
+        enterApp(b.dataset.me);
+    }));
+    $('rdListBack').addEventListener('click', goBack);
+    $('rdChatList').addEventListener('click', e => { const it = e.target.closest('[data-chat]'); if (it) openChat(it.dataset.chat); });
+
+    // chat header
+    $('rdBack').addEventListener('click', goBack);
+    $('rdMore').addEventListener('click', openMenu);
+    $('rdVid').addEventListener('click', () => startCall('video'));
+    $('rdAud').addEventListener('click', () => startCall('audio'));
+    $('rdSelCancel').addEventListener('click', exitSel);
+    $('rdSelDel').addEventListener('click', () => { const ids = Array.from(sel); exitSel(); deleteForMe(ids); });
+    $('rdEditX').addEventListener('click', cancelEdit);
+
+    // composer
+    const inp = $('rdInput');
+    inp.addEventListener('input', () => { syncSendBtn(); if (curChat === 'p2p') typingPing(); });
+    inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(pointer:fine)').matches) { e.preventDefault(); doSend(); }
+    });
+    $('rdSendBtn').addEventListener('click', () => { if ($('rdSendBtn').dataset.mode === 'mic') startRec(); else doSend(); });
+    $('rdAttachBtn').addEventListener('click', openSheet);
+    $('rdEmojiBtn').addEventListener('click', openEmoji);
+    $('rdRecCancel').addEventListener('click', cancelRec);
+    $('rdRecSend').addEventListener('click', stopRec);
+    ['rdFileMedia', 'rdFileCam', 'rdFileAudio', 'rdFileDoc'].forEach(id => {
+        $(id).addEventListener('change', e => {
+            Array.from(e.target.files || []).forEach(f => sendFile(f, false));
+            e.target.value = '';
+        });
+    });
+
+    // layer (context menus / sheets)
+    $('rdLayer').addEventListener('click', e => {
+        const t = e.target;
+        if (t.dataset && t.dataset.close) { closeLayerUI(); return; }
+        const r = t.closest('[data-react]');
+        if (r) { const m = getMsg(ctxId); closeLayerUI(); if (m) sendReact(m, (m.reactions && m.reactions.me === r.dataset.react) ? null : r.dataset.react); return; }
+        const a = t.closest('[data-act]');
+        if (a) {
+            const m = getMsg(ctxId); closeLayerUI();
+            if (!m) return;
+            if (a.dataset.act === 'edit') startEdit(m.id);
+            else if (a.dataset.act === 'unsend') unsend(m);
+            else if (a.dataset.act === 'del') deleteForMe([m.id]);
+            return;
+        }
+        const mn = t.closest('[data-menu]');
+        if (mn) {
+            closeLayerUI();
+            if (mn.dataset.menu === 'select') { sel = new Set(); updateSel(); toast('Message tap karke select karo'); }
+            else if (mn.dataset.menu === 'clear') { if (confirm('Poori chat clear kar de?')) clearChat(); }
+            return;
+        }
+        const sh = t.closest('[data-sheet]');
+        if (sh) {
+            closeLayerUI();
+            const map = { media: 'rdFileMedia', cam: 'rdFileCam', audio: 'rdFileAudio', doc: 'rdFileDoc' };
+            $(map[sh.dataset.sheet]).click();
+            return;
+        }
+        const em = t.closest('[data-emoji]');
+        if (em) { inp.value += em.dataset.emoji; syncSendBtn(); return; }
+    });
+
+    // messages: long press / tap / scroll
+    const box = $('rdMsgs');
+    let lp = null, lpStart = null, lpFired = false;
+    const longPress = (id, row) => { if (selMode) toggleSel(id); else openCtx(id, row); };
+    box.addEventListener('pointerdown', e => {
+        const row = e.target.closest('.rd-row');
+        if (!row || e.target.closest('audio,video,a')) return;
+        lpFired = false; lpStart = { x: e.clientX, y: e.clientY };
+        lp = setTimeout(() => { lpFired = true; lp = null; longPress(row.dataset.id, row); }, 450);
+    });
+    box.addEventListener('pointermove', e => {
+        if (lp && lpStart && (Math.abs(e.clientX - lpStart.x) > 10 || Math.abs(e.clientY - lpStart.y) > 10)) { clearTimeout(lp); lp = null; }
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => box.addEventListener(t, () => { clearTimeout(lp); lp = null; }));
+    box.addEventListener('click', e => {
+        if (lpFired) { lpFired = false; return; }
+        if (e.target.closest('[data-more]')) { renderLimit += 150; renderMessages(false); return; }
+        const row = e.target.closest('.rd-row');
+        if (!row) return;
+        if (selMode) { toggleSel(row.dataset.id); return; }
+        const img = e.target.closest('img.rd-img');
+        if (img && img.src) openViewer(img.src);
+    });
+    box.addEventListener('contextmenu', e => {
+        const row = e.target.closest('.rd-row');
+        if (row) { e.preventDefault(); longPress(row.dataset.id, row); }
+    });
+    box.addEventListener('scroll', () => { stick = box.scrollHeight - box.scrollTop - box.clientHeight < 140; });
+    box.addEventListener('load', () => { if (stick) box.scrollTop = box.scrollHeight; }, true);
+    box.addEventListener('loadedmetadata', () => { if (stick) box.scrollTop = box.scrollHeight; }, true);
+
+    // calls
+    $('rdCallEnd').addEventListener('click', () => endCall(true));
+    $('rdCallMute').addEventListener('click', toggleMute);
+    $('rdCallCam').addEventListener('click', toggleCam);
+    $('rdInAccept').addEventListener('click', acceptCall);
+    $('rdInReject').addEventListener('click', rejectCall);
+    $('rdViewerX').addEventListener('click', goBack);
+
+    // page / network events
+    window.addEventListener('online', () => { if (!appOpen) return; fetchPending(); flushAll(); touchLastSeen(); tgPoll(); });
+    document.addEventListener('visibilitychange', () => {
+        if (!appOpen || !ME) return;
+        if (document.hidden) {
+            if (channel && chanReady) { try { channel.untrack(); } catch (e) {} }
+            touchLastSeen();
+        } else {
+            if (channel && chanReady) { try { channel.track({ at: Date.now() }); } catch (e) {} }
+            fetchPending(); markRead(); flushAll(); tgPoll();
+        }
+    });
+    window.addEventListener('pagehide', () => { if (appOpen) touchLastSeen(); });
+}
+
+document.addEventListener('DOMContentLoaded', wire);
+})();

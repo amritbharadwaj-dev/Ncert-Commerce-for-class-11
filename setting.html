@@ -48,10 +48,21 @@
             </div>
         </section>
 
-        <button id="openContact" type="button" class="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between text-left">
-            <span class="flex items-center gap-3"><span class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl"><i data-lucide="contact" class="w-4 h-4"></i></span><span><strong class="block text-sm">Contact Us</strong><small class="text-xs text-slate-500 dark:text-slate-400">Send us a message</small></span></span>
-            <i data-lucide="chevron-right" class="w-5 h-5 text-slate-500"></i>
-        </button>
+
+        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            <button id="rdContactRow" type="button" class="w-full flex items-center justify-between text-left">
+                <div class="flex items-center space-x-2.5">
+                    <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
+                        <i data-lucide="mail" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Contact Us</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Have a query? Send us a message</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i>
+            </button>
+        </section>
 
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
@@ -88,68 +99,230 @@
 
         <div class="text-center pt-4 pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
             <p>Made in ❤️ India • Made for ❤️ India</p>
+            <p class="mt-1">i❤️you</p>
         </div>
     </main>
 
+<style>
+[hidden]{display:none!important}
+.rd-page{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;height:100dvh;background:#fff;color:#111b21}
+html.dark .rd-page{background:#0b141a;color:#e9edef}
+#rdApp{--hd:#008069;--bg:#efeae2;--in:#fff;--out:#d9fdd3;--tx:#111b21;--sub:#667781;--bd:#e9edef;--bar:#f0f2f5;--inp:#fff;--ac:#00a884;--tick:#667781}
+html.dark #rdApp{--hd:#202c33;--bg:#0b141a;--in:#202c33;--out:#005c4b;--tx:#e9edef;--sub:#8696a0;--bd:#2a3942;--bar:#202c33;--inp:#2a3942;--tick:#8696a0}
+#rdApp,#contactPage{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.rd-screen{display:none;flex-direction:column;flex:1;min-height:0;background:var(--bg)}
+.rd-screen.active{display:flex}
+.rd-head{background:var(--hd);color:#fff;display:flex;align-items:center;gap:6px;padding:8px 8px;padding-top:calc(8px + env(safe-area-inset-top));min-height:58px;flex-shrink:0}
+.rd-head h2{font-size:19px;font-weight:700;flex:1;margin:0}
+.rd-ibtn{background:none;border:0;color:inherit;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.rd-ibtn:active{background:rgba(255,255,255,.18)}
+.rd-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;flex-shrink:0}
+.rd-av.a{background:#e5a00d}.rd-av.r{background:#d6336c}.rd-av.t{background:#229ed9}
+.rd-title{flex:1;min-width:0;cursor:pointer}
+.rd-title b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-title small{display:block;font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-list{flex:1;overflow-y:auto;background:#fff}
+html.dark .rd-list{background:#0b141a}
+.rd-item{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bd)}
+.rd-item:active{background:var(--bar)}
+.rd-item .rd-av{width:50px;height:50px;font-size:21px}
+.rd-it-mid{flex:1;min-width:0}
+.rd-it-mid b{display:block;font-size:16px;color:var(--tx)}
+.rd-it-mid span{display:block;font-size:13.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-it-r{text-align:right;font-size:11.5px;color:var(--sub)}
+.rd-badge{display:inline-block;min-width:20px;padding:1px 6px;border-radius:10px;background:var(--ac);color:#fff;font-weight:700;margin-top:4px}
+.rd-foot{text-align:center;padding:10px;font-size:13px;color:var(--sub);background:#fff}
+html.dark .rd-foot{background:#0b141a}
+.rd-who{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;background:#fff}
+html.dark .rd-who{background:#0b141a}
+.rd-who-card{width:100%;max-width:340px;text-align:center}
+.rd-who-card h2{font-size:24px;font-weight:800;margin:0 0 20px;color:var(--tx)}
+.rd-who-btn{display:flex;align-items:center;gap:14px;width:100%;padding:14px;margin-bottom:12px;border-radius:16px;border:1px solid var(--bd);background:var(--bar);color:var(--tx);font-size:18px;font-weight:700;cursor:pointer}
+.rd-msgs{flex:1;overflow-y:auto;padding:10px 10px 6px;display:flex;flex-direction:column;gap:2px;overscroll-behavior:contain}
+.rd-row{display:flex;max-width:100%}
+.rd-row.out{justify-content:flex-end}
+.rd-row.in{justify-content:flex-start}
+.rd-row.sel{background:rgba(0,168,132,.25);margin:0 -10px;padding:0 10px}
+.rd-bub{position:relative;max-width:82%;padding:6px 8px 4px;border-radius:10px;font-size:15px;line-height:1.35;color:var(--tx);box-shadow:0 1px .5px rgba(11,20,26,.13);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-y}
+.rd-row.out .rd-bub{background:var(--out);border-top-right-radius:2px}
+.rd-row.in .rd-bub{background:var(--in);border-top-left-radius:2px}
+.rd-txt{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.rd-meta{float:right;margin:6px 0 0 10px;font-size:11px;color:var(--sub);display:inline-flex;align-items:center;gap:3px;line-height:1}
+.rd-tick{stroke:var(--tick);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rd-tick.seen{stroke:#53bdeb}
+.rd-bub:after{content:"";display:block;clear:both}
+.rd-del{font-style:italic;color:var(--sub)}
+.rd-img{display:block;max-width:240px;max-height:300px;min-width:120px;min-height:80px;border-radius:8px;margin-bottom:4px;object-fit:cover;background:rgba(0,0,0,.08);cursor:pointer}
+.rd-vid{display:block;max-width:240px;max-height:300px;border-radius:8px;margin-bottom:4px;background:#000}
+.rd-aud{display:block;width:230px;max-width:100%;margin-bottom:4px}
+.rd-file{display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background:rgba(0,0,0,.07);color:var(--tx);text-decoration:none;margin-bottom:4px;font-size:14px;word-break:break-all}
+.rd-react{position:absolute;bottom:-12px;right:8px;background:var(--in);border:1px solid var(--bd);border-radius:12px;padding:0 5px;font-size:14px;line-height:20px}
+.rd-row:has(.rd-react){margin-bottom:12px}
+.rd-sys{align-self:center;background:rgba(255,255,255,.9);color:#54656f;font-size:12.5px;padding:5px 12px;border-radius:8px;margin:6px 0;text-align:center;max-width:90%}
+html.dark .rd-sys{background:#182229;color:#8696a0}
+.rd-day{align-self:center;background:rgba(255,255,255,.9);color:#54656f;font-size:12px;padding:4px 10px;border-radius:8px;margin:8px 0}
+html.dark .rd-day{background:#182229;color:#8696a0}
+.rd-more{align-self:center;font-size:12.5px;color:var(--ac);padding:6px 12px;cursor:pointer}
+.rd-comp{display:flex;align-items:flex-end;gap:6px;padding:6px 8px 4px;flex-shrink:0;background:var(--bg)}
+.rd-iw{flex:1;min-width:0;background:var(--inp);border-radius:24px;display:flex;align-items:flex-end;padding:3px 4px}
+.rd-iw textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;resize:none;font:inherit;font-size:16px;color:var(--tx);padding:9px 4px;max-height:130px;line-height:1.3}
+.rd-iw .rd-ibtn{color:var(--sub);width:38px;height:38px}
+.rd-send{width:46px;height:46px;border-radius:50%;background:var(--ac);color:#fff;border:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.rd-recbar{display:flex;align-items:center;gap:10px;flex:1;background:var(--inp);border-radius:24px;padding:8px 14px;color:var(--tx)}
+.rd-recdot{width:10px;height:10px;border-radius:50%;background:#e53935;animation:rdp 1s infinite}
+@keyframes rdp{50%{opacity:.25}}
+.rd-editbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bar);color:var(--tx);font-size:13px;border-left:4px solid var(--ac)}
+.rd-editbar span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-back{position:absolute;inset:0;z-index:120;background:rgba(0,0,0,.35)}
+.rd-pop{position:absolute;z-index:121;background:var(--in);color:var(--tx);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.3);overflow:hidden;min-width:200px}
+.rd-pop button{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;background:none;border:0;color:inherit;font-size:15px;text-align:left;cursor:pointer}
+.rd-pop button:active{background:var(--bar)}
+.rd-reacts{position:absolute;z-index:121;background:var(--in);border-radius:30px;padding:6px 8px;display:flex;gap:2px;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+.rd-reacts button{background:none;border:0;font-size:27px;padding:2px 5px;border-radius:50%;cursor:pointer}
+.rd-reacts button.on{background:var(--bar)}
+.rd-sheet{position:absolute;left:0;right:0;bottom:0;z-index:121;background:var(--in);color:var(--tx);border-radius:20px 20px 0 0;padding:18px 14px calc(18px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);gap:14px;text-align:center}
+.rd-sheet button{background:none;border:0;color:inherit;font-size:12.5px;cursor:pointer}
+.rd-sheet i{display:flex;width:54px;height:54px;border-radius:50%;margin:0 auto 6px;align-items:center;justify-content:center;color:#fff}
+.rd-emoji{position:absolute;left:0;right:0;bottom:0;z-index:121;background:var(--in);border-radius:20px 20px 0 0;padding:12px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:2px;max-height:45vh;overflow-y:auto}
+.rd-emoji button{background:none;border:0;font-size:28px;width:12.5%;padding:4px 0;cursor:pointer}
+#rdCall,#rdIncoming{position:absolute;inset:0;z-index:150;background:#111b21;color:#fff;display:flex;flex-direction:column;align-items:center}
+#rdRemote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#rdLocal{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;width:100px;height:140px;object-fit:cover;border-radius:12px;background:#222;z-index:2;border:2px solid rgba(255,255,255,.4)}
+.rd-callinfo{position:relative;z-index:2;margin-top:calc(70px + env(safe-area-inset-top));text-align:center;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.rd-callinfo .rd-av{width:110px;height:110px;font-size:46px;margin:0 auto 14px}
+.rd-callinfo b{font-size:26px;display:block}
+.rd-callinfo span{font-size:15px;opacity:.9}
+.rd-callbtns{position:absolute;bottom:calc(36px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:22px;z-index:3}
+.rd-cbtn{width:62px;height:62px;border-radius:50%;border:0;background:rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rd-cbtn.on{background:#fff;color:#111}
+.rd-cbtn.end{background:#e53935}.rd-cbtn.ok{background:#25d366}
+.rd-cbtn.end svg{transform:rotate(135deg)}
+#rdCall.aud #rdRemote{opacity:0}
+#rdCall.aud #rdLocal,#rdCall.aud #rdCallCam{display:none}
+.rd-chatfoot{text-align:center;font-size:11.5px;color:var(--sub);background:var(--bg);padding:0 0 calc(5px + env(safe-area-inset-bottom));flex-shrink:0}
+#rdViewer{position:absolute;inset:0;z-index:160;background:#000;display:flex;align-items:center;justify-content:center}
+#rdViewer img{max-width:100%;max-height:100%}
+#rdViewer button{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;color:#fff}
+#contactPage{background:#fff;overflow-y:auto}
+html.dark #contactPage{background:#0b141a}
+.rd-chead{display:flex;align-items:center;gap:10px;padding:12px;padding-top:calc(12px + env(safe-area-inset-top));border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:inherit;z-index:2}
+html.dark .rd-chead{border-color:#1e293b}
+.rd-chead .rd-ibtn{color:inherit}
+.rd-chead h2{font-size:16px;font-weight:800;margin:0}
+.rd-cbody{max-width:480px;margin:0 auto;width:100%;padding:24px 18px 40px}
+.rd-cbody h1{font-size:26px;font-weight:800;margin:0 0 6px}
+.rd-cbody p{font-size:13.5px;color:#64748b;margin:0 0 20px}
+.rd-cbody label{display:block;font-size:12px;font-weight:700;color:#475569;margin:14px 0 5px}
+html.dark .rd-cbody label{color:#94a3b8}
+.rd-cbody input,.rd-cbody textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;font:inherit;font-size:15px;color:inherit;outline:0}
+html.dark .rd-cbody input,html.dark .rd-cbody textarea{background:#0f172a;border-color:#1e293b}
+.rd-cbody input:focus,.rd-cbody textarea:focus{border-color:#0f172a}
+.rd-cbody textarea{min-height:120px;resize:vertical}
+.rd-csend{width:100%;margin-top:22px;padding:14px;border-radius:14px;border:0;background:#0f172a;color:#fff;font-weight:800;font-size:15px;cursor:pointer}
+html.dark .rd-csend{background:#fff;color:#0f172a}
+.rd-toast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f172a;color:#fff;padding:12px 20px;border-radius:30px;font-size:14px;font-weight:600;z-index:300;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+</style>
 
-    <!-- Full-screen Contact Us -->
-    <section id="contactPage" class="overlay contact-overlay" aria-hidden="true">
-      <header class="green-top"><button id="closeContact" class="back-btn" aria-label="Back">‹</button><div><b>Contact Us</b><small>We'd love to hear from you</small></div></header>
-      <form id="contactForm" class="contact-form">
-        <label>Name<input name="name" autocomplete="name" placeholder="Your name"></label>
-        <label>Email<input name="email" type="email" autocomplete="email" placeholder="Email address"></label>
-        <label>Phone number<input name="phone" type="tel" autocomplete="tel" placeholder="Phone number"></label>
-        <label>WhatsApp number<input name="whatsapp" type="tel" placeholder="WhatsApp number"></label>
-        <label>Subject<input name="subject" placeholder="Subject"></label>
-        <label>Message<textarea name="message" rows="5" placeholder="Write your message…"></textarea></label>
-        <button class="primary-btn" type="submit">Send <span>➤</span></button><p id="contactStatus" role="status"></p>
-      </form>
+<!-- ============ Contact Us page ============ -->
+<div id="contactPage" class="rd-page" hidden>
+    <div class="rd-chead">
+        <button class="rd-ibtn" id="cBack" aria-label="Back"></button>
+        <h2>Contact Us</h2>
+    </div>
+    <div class="rd-cbody">
+        <h1>Contact Us</h1>
+        <p>For any query, please send us a message.</p>
+        <form id="cForm" autocomplete="off" novalidate>
+            <label>Name</label><input id="cf-name" type="text" autocomplete="off">
+            <label>Email</label><input id="cf-email" type="text" inputmode="email" autocomplete="off" autocapitalize="none">
+            <label>Phone number</label><input id="cf-phone" type="text" inputmode="tel" autocomplete="off">
+            <label>WhatsApp number</label><input id="cf-wa" type="text" inputmode="tel" autocomplete="off">
+            <label>Subject</label><input id="cf-subject" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <label>Message</label><textarea id="cf-message" autocomplete="off"></textarea>
+            <button type="submit" class="rd-csend">Send</button>
+        </form>
+    </div>
+</div>
+
+<!-- ============ Private chat app ============ -->
+<div id="rdApp" class="rd-page" hidden>
+    <section id="rdWho" class="rd-screen">
+        <div class="rd-who"><div class="rd-who-card">
+            <h2>Who you are?</h2>
+            <button class="rd-who-btn" data-me="radhe"><span class="rd-av r">R</span>Radhe</button>
+            <button class="rd-who-btn" data-me="amrit"><span class="rd-av a">A</span>Amrit</button>
+        </div></div>
     </section>
 
-    <!-- Local-first chat -->
-    <section id="chatPage" class="overlay chat-overlay" aria-hidden="true">
-      <header class="chat-top">
-        <button id="chatBack" class="back-btn" aria-label="Back">‹</button>
-        <div class="avatar" id="chatAvatar">A</div><div class="chat-title"><b id="chatTitle">Private chat</b><small id="chatPresence">Choose a profile</small></div>
-        <button id="audioCall" class="top-icon" title="Audio call" aria-label="Audio call">☎</button>
-        <button id="videoCall" class="top-icon" title="Video call" aria-label="Video call">▣</button>
-        <details class="menu"><summary aria-label="More options">⋮</summary><div>
-          <button id="connectPeer" type="button">Connect device</button><button id="exportChat" type="button">Export chat</button><button id="clearChat" type="button">Clear chat</button><button id="deleteChat" type="button">Delete local chat</button>
-        </div></details>
-      </header>
-      <div id="profileChooser" class="profile-chooser"><p>Who are you?</p><button data-profile="Radhe" type="button">Radhe</button><button data-profile="Amrit" type="button">Amrit</button></div>
-      <div id="connectionNotice" class="connection-notice">Messages are stored on this device. Connect the other device to enable sync.</div>
-      <div id="messageList" class="message-list" aria-live="polite"></div>
-      <div id="callPanel" class="call-panel" hidden><video id="remoteVideo" autoplay playsinline></video><video id="localVideo" autoplay muted playsinline></video><div><button id="muteCall" type="button">Mute</button><button id="endCall" type="button">End call</button></div></div>
-      <div class="composer">
-        <label class="attach-btn" for="chatFile" aria-label="Attach photo or video">＋</label><input id="chatFile" type="file" accept="image/*,video/*" hidden>
-        <textarea id="chatInput" rows="1" placeholder="Message" aria-label="Message"></textarea><button id="sendMessage" class="send-btn-round" type="button" aria-label="Send message">➤</button>
-      </div>
-      <footer class="chat-footer">i ❤️you</footer>
+    <section id="rdList" class="rd-screen">
+        <div class="rd-head"><button class="rd-ibtn" id="rdListBack"></button><h2>Chats</h2></div>
+        <div class="rd-list" id="rdChatList"></div>
+        <div class="rd-foot">i❤️you</div>
     </section>
-    <section id="actionSheet" class="action-sheet" hidden><div class="action-card"><b>Message options</b><div id="reactionChoices" class="reactions"></div><div class="action-grid"><button data-action="edit">Edit</button><button data-action="reply">Reply</button><button data-action="delete">Delete for me</button><button data-action="cancel">Cancel</button></div></div></section>
-    <dialog id="peerDialog"><form method="dialog" class="peer-dialog"><h3>Connect another device</h3><p>Share your device ID with the other person, then enter their ID here. Do not share this ID publicly.</p><label>Your device ID<input id="myPeerId" readonly></label><button type="button" id="copyPeerId">Copy my ID</button><label>Other person's device ID<input id="peerIdInput" placeholder="Supabase Auth user UUID"></label><div class="dialog-actions"><button value="cancel">Cancel</button><button id="savePeerId" value="default">Save connection</button></div><p id="peerDialogStatus"></p></form></dialog>
-    <dialog id="replyDialog"><form method="dialog" class="peer-dialog"><h3>Reply to message</h3><textarea id="replyText" rows="3" placeholder="Write a reply"></textarea><div class="dialog-actions"><button value="cancel">Cancel</button><button id="sendReply" value="default">Send reply</button></div></form></dialog>
-    <style>
-      .overlay{display:none;position:fixed;inset:0;z-index:1000;height:100dvh;flex-direction:column;background:#f6f7f8;color:#111b21}.overlay.active{display:flex}
-      .green-top,.chat-top{display:flex;align-items:center;gap:11px;padding:11px 14px;background:#075e54;color:white;min-height:62px;box-shadow:0 1px 3px #0002}.green-top small{display:block;font-size:12px;opacity:.8;margin-top:2px}
-      .back-btn{border:0;background:transparent;color:inherit;font-size:32px;line-height:1;min-width:30px}
-      .contact-form{overflow:auto;padding:18px;max-width:620px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px}.contact-form label,.peer-dialog label{font-size:13px;font-weight:600;display:flex;flex-direction:column;gap:6px}
-      .contact-form input,.contact-form textarea,.peer-dialog input,.peer-dialog textarea{font:inherit;font-weight:400;padding:13px;border:1px solid #d4d9dd;border-radius:10px;background:white;color:#17202a;outline-color:#128c7e;width:100%;box-sizing:border-box}
-      .primary-btn{border:0;border-radius:12px;padding:14px;background:#128c7e;color:white;font-weight:700}.contact-form #contactStatus{text-align:center;font-size:13px;min-height:16px}
-      .chat-top{gap:8px}.avatar{width:39px;height:39px;border-radius:50%;background:#d8e9e6;color:#075e54;display:grid;place-items:center;font-weight:800;flex-shrink:0}.chat-title{flex:1;min-width:0}.chat-title b{font-size:15px}.chat-title small{display:block;font-size:12px;opacity:.85;margin-top:2px}.top-icon{background:transparent;border:0;color:white;font-size:22px;padding:4px}
-      .menu{position:relative}.menu summary{list-style:none;font-size:26px;cursor:pointer;padding:4px}.menu div{position:absolute;right:0;top:32px;background:white;color:#17202a;box-shadow:0 4px 18px #0003;border-radius:8px;min-width:175px;z-index:4}.menu button{display:block;background:white;border:0;padding:12px;width:100%;text-align:left}
-      .profile-chooser{padding:13px;text-align:center;background:white;border-bottom:1px solid #e5e7eb}.profile-chooser p{margin:0 0 10px;font-weight:700}.profile-chooser button{border:0;background:#128c7e;color:white;border-radius:18px;padding:9px 22px;margin:0 5px}
-      .connection-notice{background:#fff4d7;color:#66521d;font-size:11px;text-align:center;padding:5px 8px}.message-list{flex:1;overflow:auto;padding:15px 12px;display:flex;flex-direction:column;gap:8px;background-color:#efeae2;background-image:radial-gradient(#d9d1c5 .6px,transparent .6px);background-size:14px 14px;scroll-behavior:smooth}
-      .bubble{max-width:84%;padding:8px 10px 5px;border-radius:9px;background:white;box-shadow:0 1px 1px #0001;align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere;position:relative;font-size:14px;cursor:pointer}.bubble.mine{align-self:flex-end;background:#d9fdd3}.bubble .meta{display:flex;gap:5px;justify-content:flex-end;font-size:10px;color:#667781;margin-top:4px}.bubble .ticks.seen{color:#34b7f1}.bubble img,.bubble video{max-width:100%;max-height:260px;border-radius:6px}.bubble .reply-quote{border-left:3px solid #128c7e;padding:3px 6px;background:#00000008;margin-bottom:5px;font-size:12px}
-      .composer{display:flex;align-items:flex-end;gap:7px;padding:8px;background:#f0f2f5}.composer textarea{flex:1;resize:none;max-height:130px;border:0;border-radius:22px;padding:11px 15px;font:16px Arial;outline:none;background:white}.attach-btn,.send-btn-round{border:0;border-radius:50%;width:42px;height:42px;display:grid;place-items:center;background:#128c7e;color:white;font-size:21px;flex-shrink:0;cursor:pointer}.attach-btn{background:transparent;color:#54656f;font-size:28px}.chat-footer{text-align:center;background:#f0f2f5;color:#687780;font-size:11px;padding:3px 0 5px}
-      .action-sheet{position:fixed;inset:0;background:#0005;z-index:1200;display:grid;place-items:end center}.action-sheet[hidden],.call-panel[hidden]{display:none}.action-card{width:100%;max-width:520px;background:white;padding:20px;border-radius:18px 18px 0 0;box-sizing:border-box}.reactions{display:flex;justify-content:space-between;font-size:25px;padding:14px 0}.reactions span{cursor:pointer}.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.action-grid button,.call-panel button{padding:10px;border:1px solid #ddd;border-radius:8px;background:white}
-      .call-panel{position:absolute;inset:62px 0 90px;background:#101820;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}.call-panel video{max-width:90%;max-height:40%;border-radius:12px;background:#263238}.call-panel button{margin:5px}.call-panel #endCall{background:#d32f2f;color:white}
-      dialog{border:0;border-radius:16px;max-width:450px;width:calc(100% - 34px);box-shadow:0 15px 50px #0004}dialog::backdrop{background:#0006}.peer-dialog{display:flex;flex-direction:column;gap:12px;padding:4px}.peer-dialog h3{margin:5px 0}.peer-dialog p{font-size:13px;color:#64748b}.dialog-actions{display:flex;justify-content:flex-end;gap:8px}.dialog-actions button,#copyPeerId{padding:10px 13px;border:1px solid #d1d5db;border-radius:8px;background:white}
-      @media(prefers-color-scheme:dark){.contact-overlay{background:#0f172a;color:#f8fafc}.contact-form input,.contact-form textarea{background:#1e293b;color:white;border-color:#475569}}
-    </style>
 
-    <script src="global.js"></script>
-    <script src="setting.js"></script>
+    <section id="rdChat" class="rd-screen">
+        <div class="rd-head" id="rdHead">
+            <button class="rd-ibtn" id="rdBack"></button>
+            <span class="rd-av" id="rdAv">A</span>
+            <div class="rd-title"><b id="rdName">Amrit</b><small id="rdSub"></small></div>
+            <button class="rd-ibtn" id="rdVid" title="Video call"></button>
+            <button class="rd-ibtn" id="rdAud" title="Audio call"></button>
+            <button class="rd-ibtn" id="rdMore" title="Menu"></button>
+        </div>
+        <div class="rd-head" id="rdSelBar" hidden>
+            <button class="rd-ibtn" id="rdSelCancel"></button>
+            <h2 id="rdSelCount">0</h2>
+            <button class="rd-ibtn" id="rdSelDel"></button>
+        </div>
+        <div class="rd-msgs" id="rdMsgs"></div>
+        <div class="rd-editbar" id="rdEditBar" hidden><span id="rdEditTxt"></span><button class="rd-ibtn" id="rdEditX" style="color:var(--sub);width:30px;height:30px"></button></div>
+        <div class="rd-comp" id="rdComp">
+            <div class="rd-iw">
+                <button class="rd-ibtn" id="rdEmojiBtn"></button>
+                <textarea id="rdInput" rows="1" placeholder="Message" autocomplete="off"></textarea>
+                <button class="rd-ibtn" id="rdAttachBtn"></button>
+            </div>
+            <button class="rd-send" id="rdSendBtn"></button>
+        </div>
+        <div class="rd-comp" id="rdRecComp" hidden>
+            <button class="rd-ibtn" id="rdRecCancel" style="color:#e53935"></button>
+            <div class="rd-recbar"><span class="rd-recdot"></span><b id="rdRecTime">0:00</b><span style="color:var(--sub);font-size:13px">Recording…</span></div>
+            <button class="rd-send" id="rdRecSend"></button>
+        </div>
+        <div class="rd-chatfoot">i❤️you</div>
+    </section>
+
+    <input type="file" id="rdFileMedia" accept="image/*,video/*" multiple hidden>
+    <input type="file" id="rdFileCam" accept="image/*,video/*" capture="environment" hidden>
+    <input type="file" id="rdFileAudio" accept="audio/*" multiple hidden>
+    <input type="file" id="rdFileDoc" multiple hidden>
+
+    <div id="rdLayer" hidden></div>
+
+    <div id="rdCall" hidden>
+        <video id="rdRemote" autoplay playsinline></video>
+        <video id="rdLocal" autoplay playsinline muted></video>
+        <div class="rd-callinfo"><span class="rd-av" id="rdCallAv">A</span><b id="rdCallName">Amrit</b><span id="rdCallStatus">Calling…</span></div>
+        <div class="rd-callbtns">
+            <button class="rd-cbtn" id="rdCallMute" title="Mute"></button>
+            <button class="rd-cbtn" id="rdCallCam" title="Camera"></button>
+            <button class="rd-cbtn end" id="rdCallEnd" title="End"></button>
+        </div>
+    </div>
+
+    <div id="rdIncoming" hidden>
+        <div class="rd-callinfo"><span class="rd-av" id="rdInAv">A</span><b id="rdInName">Amrit</b><span id="rdInKind">Incoming call…</span></div>
+        <div class="rd-callbtns">
+            <button class="rd-cbtn end" id="rdInReject" title="Decline"></button>
+            <button class="rd-cbtn ok" id="rdInAccept" title="Accept"></button>
+        </div>
+    </div>
+
+    <div id="rdViewer" hidden><button class="rd-ibtn" id="rdViewerX"></button><img id="rdViewerImg" alt=""></div>
+</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="global.js?v=4"></script>
+    <script src="setting.js?v=1"></script>
 </body>
 </html>
