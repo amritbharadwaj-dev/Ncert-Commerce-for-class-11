@@ -21,7 +21,6 @@
 
     <main class="flex-grow max-w-lg mx-auto w-full px-4 py-6 space-y-6 pb-20">
         
-        <!-- Theme Section -->
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
                 <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
@@ -49,73 +48,22 @@
             </div>
         </section>
 
-        <!-- New Contact Us / Secret Form Section -->
-        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
-            <div class="flex items-center space-x-2.5">
-                <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
-                    <i data-lucide="mail" class="w-4 h-4"></i>
-                </div>
-                <div>
-                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Contact Us</h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Send your query or connect with us</p>
-                </div>
-            </div>
 
-            <form id="secret-query-form" class="space-y-3 pt-2">
-                <div>
-                    <input type="text" id="fname" placeholder="First Name" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
+        <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            <button id="rdContactRow" type="button" class="w-full flex items-center justify-between text-left">
+                <div class="flex items-center space-x-2.5">
+                    <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
+                        <i data-lucide="mail" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">Contact Us</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Have a query? Send us a message</p>
+                    </div>
                 </div>
-                <div>
-                    <input type="text" id="lname" placeholder="Last Name" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
-                </div>
-                <div>
-                    <input type="tel" id="phone" placeholder="Phone Number" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
-                </div>
-                <div>
-                    <input type="tel" id="whatsapp" placeholder="WhatsApp Number" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
-                </div>
-                <div>
-                    <input type="email" id="email" placeholder="Email Address" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
-                </div>
-                <div>
-                    <input type="text" id="subject" placeholder="Subject (Type 'ramdiri' for secret app)" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none">
-                </div>
-                <div>
-                    <textarea id="message" placeholder="Your Message..." rows="3" class="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 outline-none"></textarea>
-                </div>
-                <button type="submit" class="w-full py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 transition shadow-sm cursor-pointer">Send Query</button>
-            </form>
-            <div id="form-success-msg" class="hidden text-xs font-bold text-green-600 dark:text-green-400 text-center pt-2">Query sent successfully!</div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-500 dark:text-slate-400"></i>
+            </button>
         </section>
 
-        <!-- Hidden WhatsApp-Style P2P Chat UI Container (Appears when subject is 'ramdiri') -->
-        <div id="secret-chat-ui" class="hidden bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
-            <div class="flex items-center justify-between border-b pb-2 border-slate-200 dark:border-slate-800">
-                <div class="flex items-center space-x-2">
-                    <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
-                    <h3 class="font-extrabold text-sm text-slate-900 dark:text-white" id="chat-title-header">WhatsApp P2P Hub</h3>
-                </div>
-                <button onclick="closeSecretChat()" class="text-xs text-red-500 font-bold cursor-pointer">Close</button>
-            </div>
-            
-            <div class="flex space-x-2 overflow-x-auto py-1">
-                <button onclick="switchChatTab('Instagram')" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-xs rounded-lg font-bold">Instagram</button>
-                <button onclick="switchChatTab('Telegram')" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-xs rounded-lg font-bold">Telegram</button>
-                <button onclick="switchChatTab('Commerce Hub')" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-xs rounded-lg font-bold">Commerce Hub</button>
-            </div>
-            <p class="text-[10px] text-slate-500" id="seen-status-label">Seen status enabled for Commerce Hub</p>
-
-            <div id="chat-messages-box" class="h-40 overflow-y-auto bg-white dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-2">
-                <!-- Messages go here -->
-            </div>
-
-            <div class="flex items-center space-x-2">
-                <input type="text" id="chat-msg-input" placeholder="Type a message..." class="flex-grow text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 outline-none">
-                <button onclick="sendSecretMessage()" class="p-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl text-xs font-bold">Send</button>
-            </div>
-        </div>
-
-        <!-- About Us Section -->
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
                 <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
@@ -127,13 +75,12 @@
                 </div>
             </div>
             <div class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed space-y-2.5 font-normal pt-1">
-                <p>Welcome to <strong>Commerce Hub 11</strong>, the premier digital destination meticulously engineered to revolutionize how Class 11 commerce students access, interact with, and master their academic curriculum[span_2](start_span)[span_2](end_span). In today’s fast-paced educational environment, traditional heavy textbooks and scattered digital PDFs often create friction in seamless learning[span_3](start_span)[span_3](end_span). Our platform bridges this gap by offering an ultra-fast, modern, elegant, and distraction-free digital ecosystem right in the palm of your hand[span_4](start_span)[span_4](end_span).</p>
-                <p>Founded with a passionate vision to democratize quality education across every nook and corner of India, Commerce Hub integrates official NCERT study materials, accounting principles, business studies frameworks, economic development insights, and mathematical problem-solving assets into a unified, high-performance Progressive Web Application (PWA)[span_5](start_span)[span_5](end_span). We believe that financial literacy, analytical accounting, and strategic business acumen are the foundational pillars of India's future economic growth[span_6](start_span)[span_6](end_span). Therefore, every single chapter, formula, practice set, and answer key is curated to provide absolute clarity and depth[span_7](start_span)[span_7](end_span).</p>
-                <p>Our engineering team prioritizes speed, minimalism, and reliability[span_8](start_span)[span_8](end_span). By utilizing modern web caching protocols and local storage synchronization, the application operates with near-zero latency, ensuring that students can open chapters instantly even under unstable network connections[span_9](start_span)[span_9](end_span). The crisp white and deep dark interface modes have been meticulously crafted following modern typographic and aesthetic principles to prevent eye strain during long study hours[span_10](start_span)[span_10](end_span). As we continue to expand our library and refine our tools, our commitment remains unwavering: empowering the next generation of commerce leaders, entrepreneurs, chartered accountants, and economists with world-class digital learning resources, completely free of charge and fully optimized for mobile-first education[span_11](start_span)[span_11](end_span).</p>
+                <p>Welcome to <strong>Commerce Hub 11</strong>, the premier digital destination meticulously engineered to revolutionize how Class 11 commerce students access, interact with, and master their academic curriculum. In today’s fast-paced educational environment, traditional heavy textbooks and scattered digital PDFs often create friction in seamless learning. Our platform bridges this gap by offering an ultra-fast, modern, elegant, and distraction-free digital ecosystem right in the palm of your hand.</p>
+                <p>Founded with a passionate vision to democratize quality education across every nook and corner of India, Commerce Hub integrates official NCERT study materials, accounting principles, business studies frameworks, economic development insights, and mathematical problem-solving assets into a unified, high-performance Progressive Web Application (PWA). We believe that financial literacy, analytical accounting, and strategic business acumen are the foundational pillars of India's future economic growth. Therefore, every single chapter, formula, practice set, and answer key is curated to provide absolute clarity and depth.</p>
+                <p>Our engineering team prioritizes speed, minimalism, and reliability. By utilizing modern web caching protocols and local storage synchronization, the application operates with near-zero latency, ensuring that students can open chapters instantly even under unstable network connections. The crisp white and deep dark interface modes have been meticulously crafted following modern typographic and aesthetic principles to prevent eye strain during long study hours. As we continue to expand our library and refine our tools, our commitment remains unwavering: empowering the next generation of commerce leaders, entrepreneurs, chartered accountants, and economists with world-class digital learning resources, completely free of charge and fully optimized for mobile-first education.</p>
             </div>
         </section>
 
-        <!-- Privacy Policy Section -->
         <section class="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
             <div class="flex items-center space-x-2.5">
                 <div class="bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-2 rounded-xl">
@@ -145,17 +92,233 @@
                 </div>
             </div>
             <div class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed space-y-2.5 font-normal pt-1">
-                <p>At <strong>Commerce Hub 11</strong>, we hold your personal privacy and data security with the utmost seriousness[span_12](start_span)[span_12](end_span). We operate under a strict <strong>zero-data-collection</strong> policy[span_13](start_span)[span_13](end_span). Unlike conventional applications that track your personal details, monitor browsing habits, or harvest sensitive credentials, our platform collects absolutely no personal data from its users[span_14](start_span)[span_14](end_span).</p>
-                <p>All your saved bookmarks, preferences, and reading states are securely stored exclusively within your device's local memory (LocalStorage)[span_15](start_span)[span_15](end_span). No personal information, phone numbers, email addresses, or usage logs are ever transmitted to external servers or third-party entities[span_16](start_span)[span_16](end_span). You can navigate through chapters, read educational papers, and manage your saved books in a completely safe, secure, and private digital environment[span_17](start_span)[span_17](end_span). Your education is your personal journey, and we ensure it remains entirely confidential and protected[span_18](start_span)[span_18](end_span).</p>
+                <p>At <strong>Commerce Hub 11</strong>, we hold your personal privacy and data security with the utmost seriousness. We operate under a strict <strong>zero-data-collection</strong> policy. Unlike conventional applications that track your personal details, monitor browsing habits, or harvest sensitive credentials, our platform collects absolutely no personal data from its users.</p>
+                <p>All your saved bookmarks, preferences, and reading states are securely stored exclusively within your device's local memory (LocalStorage). No personal information, phone numbers, email addresses, or usage logs are ever transmitted to external servers or third-party entities. You can navigate through chapters, read educational papers, and manage your saved books in a completely safe, secure, and private digital environment. Your education is your personal journey, and we ensure it remains entirely confidential and protected.</p>
             </div>
         </section>
 
         <div class="text-center pt-4 pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
             <p>Made in ❤️ India • Made for ❤️ India</p>
+            <p class="mt-1">i❤️you</p>
         </div>
     </main>
 
+<style>
+[hidden]{display:none!important}
+.rd-page{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;height:100dvh;background:#fff;color:#111b21}
+html.dark .rd-page{background:#0b141a;color:#e9edef}
+#rdApp{--hd:#008069;--bg:#efeae2;--in:#fff;--out:#d9fdd3;--tx:#111b21;--sub:#667781;--bd:#e9edef;--bar:#f0f2f5;--inp:#fff;--ac:#00a884;--tick:#667781}
+html.dark #rdApp{--hd:#202c33;--bg:#0b141a;--in:#202c33;--out:#005c4b;--tx:#e9edef;--sub:#8696a0;--bd:#2a3942;--bar:#202c33;--inp:#2a3942;--tick:#8696a0}
+#rdApp,#contactPage{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.rd-screen{display:none;flex-direction:column;flex:1;min-height:0;background:var(--bg)}
+.rd-screen.active{display:flex}
+.rd-head{background:var(--hd);color:#fff;display:flex;align-items:center;gap:6px;padding:8px 8px;padding-top:calc(8px + env(safe-area-inset-top));min-height:58px;flex-shrink:0}
+.rd-head h2{font-size:19px;font-weight:700;flex:1;margin:0}
+.rd-ibtn{background:none;border:0;color:inherit;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.rd-ibtn:active{background:rgba(255,255,255,.18)}
+.rd-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;flex-shrink:0}
+.rd-av.a{background:#e5a00d}.rd-av.r{background:#d6336c}.rd-av.t{background:#229ed9}
+.rd-title{flex:1;min-width:0;cursor:pointer}
+.rd-title b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-title small{display:block;font-size:12px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-list{flex:1;overflow-y:auto;background:#fff}
+html.dark .rd-list{background:#0b141a}
+.rd-item{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bd)}
+.rd-item:active{background:var(--bar)}
+.rd-item .rd-av{width:50px;height:50px;font-size:21px}
+.rd-it-mid{flex:1;min-width:0}
+.rd-it-mid b{display:block;font-size:16px;color:var(--tx)}
+.rd-it-mid span{display:block;font-size:13.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-it-r{text-align:right;font-size:11.5px;color:var(--sub)}
+.rd-badge{display:inline-block;min-width:20px;padding:1px 6px;border-radius:10px;background:var(--ac);color:#fff;font-weight:700;margin-top:4px}
+.rd-foot{text-align:center;padding:10px;font-size:13px;color:var(--sub);background:#fff}
+html.dark .rd-foot{background:#0b141a}
+.rd-who{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;background:#fff}
+html.dark .rd-who{background:#0b141a}
+.rd-who-card{width:100%;max-width:340px;text-align:center}
+.rd-who-card h2{font-size:24px;font-weight:800;margin:0 0 20px;color:var(--tx)}
+.rd-who-btn{display:flex;align-items:center;gap:14px;width:100%;padding:14px;margin-bottom:12px;border-radius:16px;border:1px solid var(--bd);background:var(--bar);color:var(--tx);font-size:18px;font-weight:700;cursor:pointer}
+.rd-msgs{flex:1;overflow-y:auto;padding:10px 10px 6px;display:flex;flex-direction:column;gap:2px;overscroll-behavior:contain;scroll-behavior:smooth}
+.rd-row{display:flex;max-width:100%}
+.rd-row.out{justify-content:flex-end}
+.rd-row.in{justify-content:flex-start}
+.rd-row.sel{background:rgba(0,168,132,.25);margin:0 -10px;padding:0 10px}
+.rd-bub{position:relative;max-width:82%;padding:6px 8px 4px;border-radius:10px;font-size:15px;line-height:1.35;color:var(--tx);box-shadow:0 1px .5px rgba(11,20,26,.13);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-y}
+.rd-row.out .rd-bub{background:var(--out);border-top-right-radius:2px}
+.rd-row.in .rd-bub{background:var(--in);border-top-left-radius:2px}
+.rd-txt{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.rd-meta{float:right;margin:6px 0 0 10px;font-size:11px;color:var(--sub);display:inline-flex;align-items:center;gap:3px;line-height:1}
+.rd-tick{stroke:var(--tick);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rd-tick.seen{stroke:#53bdeb}
+.rd-bub:after{content:"";display:block;clear:both}
+.rd-del{font-style:italic;color:var(--sub)}
+.rd-img{display:block;max-width:240px;max-height:300px;min-width:120px;min-height:80px;border-radius:8px;margin-bottom:4px;object-fit:cover;background:rgba(0,0,0,.08);cursor:pointer}
+.rd-vid{display:block;max-width:240px;max-height:300px;border-radius:8px;margin-bottom:4px;background:#000}
+.rd-aud{display:block;width:230px;max-width:100%;margin-bottom:4px}
+.rd-file{display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;background:rgba(0,0,0,.07);color:var(--tx);text-decoration:none;margin-bottom:4px;font-size:14px;word-break:break-all}
+.rd-react{position:absolute;bottom:-12px;right:8px;background:var(--in);border:1px solid var(--bd);border-radius:12px;padding:0 5px;font-size:14px;line-height:20px}
+.rd-row:has(.rd-react){margin-bottom:12px}
+.rd-sys{align-self:center;background:rgba(255,255,255,.9);color:#54656f;font-size:12.5px;padding:5px 12px;border-radius:8px;margin:6px 0;text-align:center;max-width:90%}
+html.dark .rd-sys{background:#182229;color:#8696a0}
+.rd-day{align-self:center;background:rgba(255,255,255,.9);color:#54656f;font-size:12px;padding:4px 10px;border-radius:8px;margin:8px 0}
+html.dark .rd-day{background:#182229;color:#8696a0}
+.rd-more{align-self:center;font-size:12.5px;color:var(--ac);padding:6px 12px;cursor:pointer}
+.rd-comp{display:flex;align-items:flex-end;gap:6px;padding:6px 8px;padding-bottom:calc(6px + env(safe-area-inset-bottom));flex-shrink:0;background:var(--bg)}
+.rd-iw{flex:1;min-width:0;background:var(--inp);border-radius:24px;display:flex;align-items:flex-end;padding:3px 4px}
+.rd-iw textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;resize:none;font:inherit;font-size:16px;color:var(--tx);padding:9px 4px;max-height:130px;line-height:1.3}
+.rd-iw .rd-ibtn{color:var(--sub);width:38px;height:38px}
+.rd-send{width:46px;height:46px;border-radius:50%;background:var(--ac);color:#fff;border:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.rd-recbar{display:flex;align-items:center;gap:10px;flex:1;background:var(--inp);border-radius:24px;padding:8px 14px;color:var(--tx)}
+.rd-recdot{width:10px;height:10px;border-radius:50%;background:#e53935;animation:rdp 1s infinite}
+@keyframes rdp{50%{opacity:.25}}
+.rd-editbar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bar);color:var(--tx);font-size:13px;border-left:4px solid var(--ac)}
+.rd-editbar span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-back{position:absolute;inset:0;z-index:120;background:rgba(0,0,0,.35)}
+.rd-pop{position:absolute;z-index:121;background:var(--in);color:var(--tx);border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.3);overflow:hidden;min-width:200px}
+.rd-pop button{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;background:none;border:0;color:inherit;font-size:15px;text-align:left;cursor:pointer}
+.rd-pop button:active{background:var(--bar)}
+.rd-reacts{position:absolute;z-index:121;background:var(--in);border-radius:30px;padding:6px 8px;display:flex;gap:2px;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+.rd-reacts button{background:none;border:0;font-size:27px;padding:2px 5px;border-radius:50%;cursor:pointer}
+.rd-reacts button.on{background:var(--bar)}
+.rd-sheet{position:absolute;left:0;right:0;bottom:0;z-index:121;background:var(--in);color:var(--tx);border-radius:20px 20px 0 0;padding:18px 14px calc(18px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(4,1fr);gap:14px;text-align:center}
+.rd-sheet button{background:none;border:0;color:inherit;font-size:12.5px;cursor:pointer}
+.rd-sheet i{display:flex;width:54px;height:54px;border-radius:50%;margin:0 auto 6px;align-items:center;justify-content:center;color:#fff}
+.rd-emoji{position:absolute;left:0;right:0;bottom:0;z-index:121;background:var(--in);border-radius:20px 20px 0 0;padding:12px 10px calc(12px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:2px;max-height:45vh;overflow-y:auto}
+.rd-emoji button{background:none;border:0;font-size:28px;width:12.5%;padding:4px 0;cursor:pointer}
+#rdCall,#rdIncoming{position:absolute;inset:0;z-index:150;background:#111b21;color:#fff;display:flex;flex-direction:column;align-items:center}
+#rdRemote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#rdLocal{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;width:100px;height:140px;object-fit:cover;border-radius:12px;background:#222;z-index:2;border:2px solid rgba(255,255,255,.4)}
+.rd-callinfo{position:relative;z-index:2;margin-top:calc(70px + env(safe-area-inset-top));text-align:center;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.rd-callinfo .rd-av{width:110px;height:110px;font-size:46px;margin:0 auto 14px}
+.rd-callinfo b{font-size:26px;display:block}
+.rd-callinfo span{font-size:15px;opacity:.9}
+.rd-callbtns{position:absolute;bottom:calc(36px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:22px;z-index:3}
+.rd-cbtn{width:62px;height:62px;border-radius:50%;border:0;background:rgba(255,255,255,.22);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rd-cbtn.on{background:#fff;color:#111}
+.rd-cbtn.end{background:#e53935}.rd-cbtn.ok{background:#25d366}
+.rd-cbtn.end svg{transform:rotate(135deg)}
+#rdViewer{position:absolute;inset:0;z-index:160;background:#000;display:flex;align-items:center;justify-content:center}
+#rdViewer img{max-width:100%;max-height:100%}
+#rdViewer button{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;color:#fff}
+#contactPage{background:#fff;overflow-y:auto}
+html.dark #contactPage{background:#0b141a}
+.rd-chead{display:flex;align-items:center;gap:10px;padding:12px;padding-top:calc(12px + env(safe-area-inset-top));border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:inherit;z-index:2}
+html.dark .rd-chead{border-color:#1e293b}
+.rd-chead .rd-ibtn{color:inherit}
+.rd-chead h2{font-size:16px;font-weight:800;margin:0}
+.rd-cbody{max-width:480px;margin:0 auto;width:100%;padding:24px 18px 40px}
+.rd-cbody h1{font-size:26px;font-weight:800;margin:0 0 6px}
+.rd-cbody p{font-size:13.5px;color:#64748b;margin:0 0 20px}
+.rd-cbody label{display:block;font-size:12px;font-weight:700;color:#475569;margin:14px 0 5px}
+html.dark .rd-cbody label{color:#94a3b8}
+.rd-cbody input,.rd-cbody textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;font:inherit;font-size:15px;color:inherit;outline:0}
+html.dark .rd-cbody input,html.dark .rd-cbody textarea{background:#0f172a;border-color:#1e293b}
+.rd-cbody input:focus,.rd-cbody textarea:focus{border-color:#0f172a}
+.rd-cbody textarea{min-height:120px;resize:vertical}
+.rd-csend{width:100%;margin-top:22px;padding:14px;border-radius:14px;border:0;background:#0f172a;color:#fff;font-weight:800;font-size:15px;cursor:pointer}
+html.dark .rd-csend{background:#fff;color:#0f172a}
+.rd-toast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f172a;color:#fff;padding:12px 20px;border-radius:30px;font-size:14px;font-weight:600;z-index:300;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+</style>
+
+<!-- ============ Contact Us page ============ -->
+<div id="contactPage" class="rd-page" hidden>
+    <div class="rd-chead">
+        <button class="rd-ibtn" id="cBack" aria-label="Back"></button>
+        <h2>Contact Us</h2>
+    </div>
+    <div class="rd-cbody">
+        <h1>Contact Us</h1>
+        <p>For any query, please send us a message.</p>
+        <form id="cForm" autocomplete="off" novalidate>
+            <label>Name</label><input id="cf-name" type="text" autocomplete="off">
+            <label>Email</label><input id="cf-email" type="text" inputmode="email" autocomplete="off" autocapitalize="none">
+            <label>Phone number</label><input id="cf-phone" type="text" inputmode="tel" autocomplete="off">
+            <label>WhatsApp number</label><input id="cf-wa" type="text" inputmode="tel" autocomplete="off">
+            <label>Subject</label><input id="cf-subject" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+            <label>Message</label><textarea id="cf-message" autocomplete="off"></textarea>
+            <button type="submit" class="rd-csend">Send</button>
+        </form>
+    </div>
+</div>
+
+<!-- ============ Private chat app ============ -->
+<div id="rdApp" class="rd-page" hidden>
+    <section id="rdWho" class="rd-screen">
+        <div class="rd-who"><div class="rd-who-card">
+            <h2>Who you are?</h2>
+            <button class="rd-who-btn" data-me="radhe"><span class="rd-av r">R</span>Radhe</button>
+            <button class="rd-who-btn" data-me="amrit"><span class="rd-av a">A</span>Amrit</button>
+        </div></div>
+    </section>
+
+    <section id="rdList" class="rd-screen">
+        <div class="rd-head"><button class="rd-ibtn" id="rdListBack"></button><h2>Chats</h2></div>
+        <div class="rd-list" id="rdChatList"></div>
+        <div class="rd-foot">i❤️you</div>
+    </section>
+
+    <section id="rdChat" class="rd-screen">
+        <div class="rd-head" id="rdHead">
+            <button class="rd-ibtn" id="rdBack"></button>
+            <span class="rd-av" id="rdAv">A</span>
+            <div class="rd-title"><b id="rdName">Amrit</b><small id="rdSub"></small></div>
+            <button class="rd-ibtn" id="rdVid" title="Video call"></button>
+            <button class="rd-ibtn" id="rdAud" title="Audio call"></button>
+            <button class="rd-ibtn" id="rdMore" title="Menu"></button>
+        </div>
+        <div class="rd-head" id="rdSelBar" hidden>
+            <button class="rd-ibtn" id="rdSelCancel"></button>
+            <h2 id="rdSelCount">0</h2>
+            <button class="rd-ibtn" id="rdSelDel"></button>
+        </div>
+        <div class="rd-msgs" id="rdMsgs"></div>
+        <div class="rd-editbar" id="rdEditBar" hidden><span id="rdEditTxt"></span><button class="rd-ibtn" id="rdEditX" style="color:var(--sub);width:30px;height:30px"></button></div>
+        <div class="rd-comp" id="rdComp">
+            <div class="rd-iw">
+                <button class="rd-ibtn" id="rdEmojiBtn"></button>
+                <textarea id="rdInput" rows="1" placeholder="Message" autocomplete="off"></textarea>
+                <button class="rd-ibtn" id="rdAttachBtn"></button>
+            </div>
+            <button class="rd-send" id="rdSendBtn"></button>
+        </div>
+        <div class="rd-comp" id="rdRecComp" hidden>
+            <button class="rd-ibtn" id="rdRecCancel" style="color:#e53935"></button>
+            <div class="rd-recbar"><span class="rd-recdot"></span><b id="rdRecTime">0:00</b><span style="color:var(--sub);font-size:13px">Recording…</span></div>
+            <button class="rd-send" id="rdRecSend"></button>
+        </div>
+    </section>
+
+    <input type="file" id="rdFileMedia" accept="image/*,video/*" multiple hidden>
+    <input type="file" id="rdFileCam" accept="image/*,video/*" capture="environment" hidden>
+    <input type="file" id="rdFileAudio" accept="audio/*" multiple hidden>
+    <input type="file" id="rdFileDoc" multiple hidden>
+
+    <div id="rdLayer" hidden></div>
+
+    <div id="rdCall" hidden>
+        <video id="rdRemote" autoplay playsinline></video>
+        <video id="rdLocal" autoplay playsinline muted></video>
+        <div class="rd-callinfo"><span class="rd-av" id="rdCallAv">A</span><b id="rdCallName">Amrit</b><span id="rdCallStatus">Calling…</span></div>
+        <div class="rd-callbtns">
+            <button class="rd-cbtn" id="rdCallMute" title="Mute"></button>
+            <button class="rd-cbtn" id="rdCallCam" title="Camera"></button>
+            <button class="rd-cbtn end" id="rdCallEnd" title="End"></button>
+        </div>
+    </div>
+
+    <div id="rdIncoming" hidden>
+        <div class="rd-callinfo"><span class="rd-av" id="rdInAv">A</span><b id="rdInName">Amrit</b><span id="rdInKind">Incoming call…</span></div>
+        <div class="rd-callbtns">
+            <button class="rd-cbtn end" id="rdInReject" title="Decline"></button>
+            <button class="rd-cbtn ok" id="rdInAccept" title="Accept"></button>
+        </div>
+    </div>
+
+    <div id="rdViewer" hidden><button class="rd-ibtn" id="rdViewerX"></button><img id="rdViewerImg" alt=""></div>
+</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="global.js"></script>
-    <script src="setting.js"></script>
+    <script src="setting.js?v=1"></script>
 </body>
 </html>
