@@ -2147,7 +2147,7 @@ function wire() {
 
     // messages: long press / tap / scroll
     const box = $('rdMsgs');
-    let lp = null, lpStart = null, lpFired = false;
+    let lp = null, lpStart = null, lpFired = false, lastTapId = null, lastTapT = 0, tapTimer = 0;
     const longPress = (id, row) => { if (selMode) toggleSel(id); else openCtx(id, row); };
     box.addEventListener('pointerdown', e => {
         const row = e.target.closest('.rd-row');
@@ -2169,8 +2169,13 @@ function wire() {
         if (selMode) { toggleSel(row.dataset.id); return; }
         const qq = e.target.closest('[data-qid]');
         if (qq) { jumpTo(qq.dataset.qid); return; }
+        if (e.target.closest('audio,video,a')) return;
+        const now = Date.now(), rid = row.dataset.id;
+        if (lastTapId === rid && now - lastTapT < 320) { clearTimeout(tapTimer); lastTapId = null; likeMsg(rid); return; }
+        lastTapId = rid; lastTapT = now;
+        clearTimeout(tapTimer);
         const img = e.target.closest('img.rd-img');
-        if (img && img.src) openViewer(img.src);
+        if (img && img.src) { const src = img.src; tapTimer = setTimeout(() => openViewer(src), 300); }
     });
     box.addEventListener('contextmenu', e => {
         const row = e.target.closest('.rd-row');
