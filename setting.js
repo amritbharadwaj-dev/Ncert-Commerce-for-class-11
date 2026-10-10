@@ -146,6 +146,12 @@ const P = {
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     undo: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
     check: '<polyline points="20 6 9 17 4 12"/>',
+    paperclip: '<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+    search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    palette: '<circle cx="13.5" cy="6.5" r=".6"/><circle cx="17.5" cy="10.5" r=".6"/><circle cx="8.5" cy="7.5" r=".6"/><circle cx="6.5" cy="12.5" r=".6"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.12a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2z"/>',
+    copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+    forward: '<polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/>',
+    user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     screen: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
     flip: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
     bookmark: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
@@ -208,11 +214,14 @@ let rec = null, call = null, callTimer = null, callTick = null, typingTimer = nu
 let rafId = 0, rafForce = false, ctxId = null;
 const busy = new Set(), urlCache = {}, memBlobs = {}, incoming = { cur: null };
 const RANK = { pending: 0, sent: 1, delivered: 2, seen: 3 };
-let nick = '', photoURL = null;
-const peerName = () => nick || NAMES[PEER];
+let nicks = { p2p: '', tg: '' }, photos = { p2p: null, tg: null }, profChat = 'p2p';
+const nameOf = w => w === 'p2p' ? (NAMES[PEER] || '') : w === 'tg' ? 'Telegram' : 'Saved';
+const chatName = w => nicks[w] || nameOf(w);
+const peerName = () => chatName('p2p');
+const pkey = w => w === 'p2p' ? PEER : 'tg';
 function avInfo(which) {
-    if (which === 'p2p') return { cls: PEER === 'radhe' ? 'r' : 'a', letter: NAMES[PEER][0], photo: photoURL };
-    if (which === 'tg') return { cls: 't', letter: 'T', photo: null };
+    if (which === 'p2p') return { cls: PEER === 'radhe' ? 'r' : 'a', letter: NAMES[PEER][0], photo: photos.p2p };
+    if (which === 'tg') return { cls: 't', letter: 'T', photo: photos.tg };
     return { cls: 's', letter: '', photo: null };
 }
 function paintAv(el, which, extra) {
@@ -228,19 +237,25 @@ function avHTML(which) {
     return '<span class="rd-av ' + a.cls + '" data-avof="' + which + '">' + (which === 'saved' ? ic('bookmark', 24) : a.letter) + '</span>';
 }
 async function loadProfile() {
-    nick = (await dbGet('kv', 'nick_' + PEER)) || '';
-    const b = await dbGet('blobs', 'photo_' + PEER);
-    if (photoURL) { URL.revokeObjectURL(photoURL); photoURL = null; }
-    if (b) photoURL = URL.createObjectURL(b);
-    applyNames();
+    for (const w of ['p2p', 'tg']) {
+        nicks[w] = (await dbGet('kv', 'nick_' + pkey(w))) || '';
+        const b = await dbGet('blobs', 'photo_' + pkey(w));
+        if (photos[w]) { URL.revokeObjectURL(photos[w]); photos[w] = null; }
+        if (b) photos[w] = URL.createObjectURL(b);
+    }
+    bgId = (await dbGet('kv', 'bg')) || 'auto';
+    const bp = await dbGet('blobs', 'bgphoto');
+    if (bgURL) { URL.revokeObjectURL(bgURL); bgURL = null; }
+    if (bp) bgURL = URL.createObjectURL(bp);
+    applyNames(); applyBg();
     renderList();
 }
 function applyNames() {
-    if (curChat === 'p2p') { $('rdName').textContent = peerName(); paintAv($('rdAv'), 'p2p'); }
-    paintAv($('rdProfAv'), 'p2p', 'big');
-    $('rdProfName').textContent = NAMES[PEER] || '';
+    if (curChat === 'p2p' || curChat === 'tg') { $('rdName').textContent = chatName(curChat); paintAv($('rdAv'), curChat); }
+    paintAv($('rdProfAv'), profChat, 'big');
+    $('rdProfName').textContent = nameOf(profChat);
     const nt = $('rdNickTxt');
-    if (nt) { nt.textContent = nick || 'Add nickname'; nt.style.opacity = nick ? '1' : '.5'; }
+    if (nt) { nt.textContent = nicks[profChat] || 'Add nickname'; nt.style.opacity = nicks[profChat] ? '1' : '.5'; }
     $('rdCallName').textContent = peerName(); $('rdInName').textContent = peerName();
     paintAv($('rdCallAv'), 'p2p'); paintAv($('rdInAv'), 'p2p');
 }
@@ -280,6 +295,7 @@ function closeLayer(n) {
     else if (n === 'chat') leaveChat();
     else if (n === 'viewer') { $('rdViewer').hidden = true; $('rdViewerImg').src = ''; $('rdViewerLetter').hidden = true; }
     else if (n === 'profile') { showScreen('rdChat'); cancelNick(); }
+    else if (n === 'crop') { $('rdCrop').hidden = true; if (crop.img && crop.img.close) { try { crop.img.close(); } catch (e) {} } crop.img = null; crop.cb = null; }
 }
 function showScreen(id) { ['rdWho', 'rdList', 'rdChat', 'rdProfile'].forEach(s => $(s).classList.toggle('active', s === id)); }
 
@@ -638,14 +654,14 @@ async function handleEvt(e, blob) {
         case 'typing':
             peerTyping = !!e.on;
             clearTimeout(typingTimer);
-            if (peerTyping) typingTimer = setTimeout(() => { peerTyping = false; updateSub(); }, 4500);
-            updateSub();
+            if (peerTyping) typingTimer = setTimeout(() => { peerTyping = false; updateSub(); renderList(); }, 3500);
+            updateSub(); renderList();
             return;
     }
 }
 async function onMsg(e, blob) {
     if (getMsg(e.id)) { if (!e.system) ackMsg(e.id, 'delivered'); return; }
-    const m = { id: e.id, chat: 'p2p', from: 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, sk: e.sk || '', voice: !!e.voice, status: 'received', read: false, reactions: {} };
+    const m = { id: e.id, chat: 'p2p', from: 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, sk: e.sk || '', fwd: !!e.fwd, cl: e.cl ? Object.assign({}, e.cl, { dir: e.cl.dir === 'out' ? 'in' : 'out' }) : undefined, voice: !!e.voice, status: 'received', read: false, reactions: {} };
     if (e.media) {
         m.media = { name: e.media.name, type: e.media.type, size: e.media.size };
         if (!blob && e.media.path) {
@@ -680,7 +696,7 @@ async function p2pSend(o) {
     const file = o.file;
     if (file && file.size > MAX_P2P_FILE) { toast('File bahut badi hai (1 GB limit)'); return; }
     if (file && file.size > MAX_DB_FILE && !dcOpen()) toast('Badi file — P2P connect hote hi jaayegi');
-    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: 'pending', reactions: {}, voice: !!o.voice };
+    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: 'pending', reactions: {}, voice: !!o.voice, fwd: !!o.fwd };
     if (file) {
         m.media = { name: file.name || ('file_' + Date.now()), type: file.type || 'application/octet-stream', size: file.size };
         memBlobs[m.id] = file;
@@ -714,7 +730,7 @@ function deliver(m) {
 }
 async function deliverNow(m) {
     if (m.deleted) return;
-    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
+    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, fwd: !!m.fwd, media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
     if (dcOpen()) {
         try {
             if (m.media) {
@@ -770,7 +786,7 @@ function sendReact(m, emoji) {
     m.reactions = m.reactions || {};
     if (emoji) m.reactions.me = emoji; else delete m.reactions.me;
     saveMsg(m); redraw();
-    queueEvt({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
+    if (m.chat === 'p2p') queueEvt({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
 }
 function commitEdit(text) {
     const m = getMsg(editingId);
@@ -813,7 +829,7 @@ function sendFile(file, voice) {
     else p2pSend({ file, voice });
 }
 async function savedAdd(o) {
-    const m = { id: 'sv_' + uid(), chat: 'saved', from: 'me', ts: Date.now(), text: o.text || '', status: 'sent', read: true, reactions: {}, voice: !!o.voice };
+    const m = { id: 'sv_' + uid(), chat: 'saved', from: 'me', ts: Date.now(), text: o.text || '', status: 'sent', read: true, reactions: {}, voice: !!o.voice, fwd: !!o.fwd };
     if (o.file) {
         m.media = { name: o.file.name || ('file_' + Date.now()), type: o.file.type || 'application/octet-stream', size: o.file.size };
         memBlobs[m.id] = o.file;
@@ -829,9 +845,9 @@ function sendTyping(on) {
 }
 function typingPing() {
     const now = Date.now();
-    if (now - typingSentAt > 2500) { typingSentAt = now; sendTyping(true); }
+    if (now - typingSentAt > 1200) { typingSentAt = now; sendTyping(true); }
     clearTimeout(typingOffTimer);
-    typingOffTimer = setTimeout(() => { typingSentAt = 0; sendTyping(false); }, 3000);
+    typingOffTimer = setTimeout(() => { typingSentAt = 0; sendTyping(false); }, 2200);
 }
 
 /* ------------------------------ RENDERING ------------------------------ */
@@ -853,11 +869,35 @@ function mediaHTML(m) {
     if (k === 'audio') return '<audio class="rd-aud" data-mid="' + m.id + '"' + ok + ' controls preload="metadata"' + (u ? ' src="' + u + '"' : '') + '></audio>';
     return '<a class="rd-file" data-mid="' + m.id + '"' + ok + ' download="' + esc(md.name) + '"' + (u ? ' href="' + u + '"' : '') + '>' + ic('file', 20) + '<span>' + esc(md.name) + '<br><small>' + fmtSize(md.size) + '</small></span></a>';
 }
-function msgHTML(m) {
+function durText(ms) {
+    const s = Math.round(ms / 1000);
+    if (s < 60) return s + ' secs';
+    const mm = Math.floor(s / 60), ss = s % 60;
+    return mm + ' min' + (ss ? ' ' + ss + ' secs' : '');
+}
+function callHTML(m, first) {
+    const c = m.cl;
+    const ok = c.result === 'ok';
+    const kt = c.kind === 'video' ? 'Video call' : 'Voice call';
+    let title = kt, sub = '';
+    switch (c.result) {
+        case 'ok': sub = durText(c.dur || 0); break;
+        case 'noans': sub = 'No answer'; break;
+        case 'cancelled': sub = 'Cancelled'; break;
+        case 'declined': sub = 'Declined'; break;
+        case 'busy': sub = 'Busy'; break;
+        case 'offline': sub = 'Not connected • offline'; break;
+        case 'failed': sub = 'Not connected'; break;
+        case 'missed': title = 'Missed ' + kt.toLowerCase(); sub = c.note === 'offline' ? 'You were offline' : 'Tap call to ring back'; break;
+    }
+    return '<div class="rd-row ' + (c.dir === 'out' ? 'out' : 'in') + (sel.has(m.id) ? ' sel' : '') + '" data-id="' + m.id + '"><div class="rd-call ' + (ok ? 'ok' : 'bad') + '"><span class="rd-call-ic">' + ic(c.kind === 'video' ? 'video' : 'phone', 20) + '</span><div class="rd-call-t"><b>' + title + '</b><span>' + sub + '</span></div><time>' + fmtTime(m.ts) + '</time></div></div>';
+}
+function msgHTML(m, first) {
+    if (m.system && m.cl) return callHTML(m, first);
     if (m.system) return '<div class="rd-sys' + (m.sk === 'call' ? ' call' : '') + '">' + (m.sk === 'call' ? '📞 ' : '') + esc(m.text) + '</div>';
     const out = m.from === 'me';
-    let inner = '';
-    if (m.deleted) inner = '<span class="rd-del">🚫 ' + (out ? 'You deleted this message' : 'This message was deleted') + '</span>';
+    let inner = m.fwd && !m.deleted ? '<div class="rd-fwd">↪ Forwarded</div>' : '';
+    if (m.deleted) inner += '<span class="rd-del">🚫 ' + (out ? 'You deleted this message' : 'This message was deleted') + '</span>';
     else {
         if (m.rx) inner += '<div class="rd-prog" data-prog="' + m.id + '"><span>Receiving ' + (m.prog || 0) + '%</span><div class="rd-pbar"><i style="width:' + (m.prog || 0) + '%"></i></div></div><div style="font-size:14px">' + esc(m.media.name) + ' • ' + fmtSize(m.media.size) + '</div>';
         else {
@@ -871,7 +911,7 @@ function msgHTML(m) {
     const r = m.reactions || {};
     const re = [r.me, r.peer].filter(Boolean);
     const rhtml = re.length ? '<div class="rd-react">' + Array.from(new Set(re)).join('') + (re.length > 1 && r.me !== r.peer ? '' : (re.length > 1 ? '2' : '')) + '</div>' : '';
-    return '<div class="rd-row ' + (out ? 'out' : 'in') + (sel.has(m.id) ? ' sel' : '') + '" data-id="' + m.id + '"><div class="rd-bub">' + inner + meta + rhtml + '</div></div>';
+    return '<div class="rd-row ' + (out ? 'out' : 'in') + (first ? ' first' : '') + (sel.has(m.id) ? ' sel' : '') + '" data-id="' + m.id + '"><div class="rd-bub">' + inner + meta + rhtml + '</div></div>';
 }
 function renderMessages(force) {
     if (!curChat) return;
@@ -880,15 +920,31 @@ function renderMessages(force) {
     const all = msgs.filter(m => m.chat === curChat);
     const list = all.slice(-renderLimit);
     let html = all.length > list.length ? '<div class="rd-more" data-more="1">Load earlier messages</div>' : '';
-    let last = '';
+    let last = '', prev = null;
     for (const m of list) {
         const k = dayKey(m.ts);
-        if (k !== last) { html += '<div class="rd-day">' + esc(dayLabel(m.ts)) + '</div>'; last = k; }
-        html += msgHTML(m);
+        if (k !== last) { html += '<div class="rd-day">' + esc(dayLabel(m.ts)) + '</div>'; last = k; prev = null; }
+        const first = !prev || prev.system || prev.from !== m.from;
+        html += msgHTML(m, first);
+        prev = m;
     }
     box.innerHTML = html;
     hydrate();
+    syncTypingBubble();
     if (toBottom) box.scrollTop = box.scrollHeight;
+    positionReactBar();
+}
+function syncTypingBubble() {
+    const box = $('rdMsgs');
+    if (!box) return;
+    const ex = box.querySelector('.rd-typing');
+    const want = curChat === 'p2p' && peerTyping;
+    if (want && !ex) {
+        const d = document.createElement('div');
+        d.className = 'rd-typing'; d.innerHTML = '<i></i><i></i><i></i>';
+        box.appendChild(d);
+        if (stick) box.scrollTop = box.scrollHeight;
+    } else if (!want && ex) ex.remove();
 }
 async function getURL(id) {
     if (urlCache[id]) return urlCache[id];
@@ -919,27 +975,32 @@ function previewOf(m) {
 function renderList() {
     const el = $('rdChatList');
     if (!el || !PEER) return;
-    const rows = [
-        { id: 'p2p', name: peerName() },
-        { id: 'tg', name: 'Telegram' },
-        { id: 'saved', name: 'Saved' }
-    ];
+    const q = (($('rdSearch') && $('rdSearch').value) || '').trim().toLowerCase();
+    let rows = ['p2p', 'tg', 'saved'].map(id => ({ id, name: chatName(id) }));
+    if (q) rows = rows.filter(r => (r.name + ' ' + nameOf(r.id)).toLowerCase().includes(q));
+    if (!rows.length) { el.innerHTML = '<div class="rd-empty">Koi chat nahi mili</div>'; return; }
     el.innerHTML = rows.map(r => {
         let last = null, unread = 0;
         for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].chat === r.id) { if (!last) last = msgs[i]; } }
         msgs.forEach(m => { if (m.chat === r.id && m.from === 'peer' && !m.read) unread++; });
-        const sub = last ? previewOf(last) : (r.id === 'p2p' ? (dcOpen() ? 'connected' : peerOnline ? 'online' : 'Tap to chat') : r.id === 'saved' ? 'Save anything here' : 'Tap to chat');
-        return '<div class="rd-item" data-chat="' + r.id + '">' + avHTML(r.id) + '<div class="rd-it-mid"><b>' + esc(r.name) + '</b><span>' + esc(sub) + '</span></div><div class="rd-it-r">' + (last ? fmtTime(last.ts) : '') + (unread ? '<br><span class="rd-badge">' + unread + '</span>' : '') + '</div></div>';
+        let sub = last ? previewOf(last) : (r.id === 'p2p' ? (dcOpen() ? 'connected' : peerOnline ? 'online' : 'Tap to chat') : r.id === 'saved' ? 'Save anything here' : 'Tap to chat');
+        let cls = '';
+        if (r.id === 'p2p' && peerTyping) { sub = 'typing…'; cls = ' class="rd-typ"'; }
+        return '<div class="rd-item" data-chat="' + r.id + '">' + avHTML(r.id) + '<div class="rd-it-mid"><b>' + esc(r.name) + '</b><span' + cls + '>' + esc(sub) + '</span></div><div class="rd-it-r">' + (last ? fmtTime(last.ts) : '') + (unread ? '<br><span class="rd-badge">' + unread + '</span>' : '') + '</div></div>';
     }).join('');
 }
+function statusText() { return dcOpen() ? 'connected' : peerOnline ? 'online' : lastSeenText(); }
 function updateSub() {
     const el = $('rdSub');
+    const ps = $('rdProfSt');
+    if (ps) ps.textContent = profChat === 'tg' ? 'Telegram bot' : statusText();
     if (!el || !curChat) return;
+    el.classList.remove('typing');
     if (curChat === 'tg') { el.textContent = 'Telegram bot'; return; }
     if (curChat === 'saved') { el.textContent = 'Only on this device'; return; }
-    el.textContent = peerTyping ? 'typing…' : dcOpen() ? 'connected' : peerOnline ? 'online' : lastSeenText();
-    const ps = $('rdProfSt');
-    if (ps) ps.textContent = dcOpen() ? 'connected' : peerOnline ? 'online' : lastSeenText();
+    if (peerTyping) { el.textContent = 'typing…'; el.classList.add('typing'); }
+    else el.textContent = statusText();
+    syncTypingBubble();
 }
 
 /* ------------------------------ CHAT OPEN / CLOSE ------------------------------ */
@@ -947,7 +1008,7 @@ function openChat(which) {
     curChat = which; renderLimit = 150; stick = true;
     const p = which === 'p2p';
     paintAv($('rdAv'), which);
-    $('rdName').textContent = p ? peerName() : which === 'tg' ? 'Telegram' : 'Saved';
+    $('rdName').textContent = chatName(which);
     $('rdVid').hidden = !p; $('rdAud').hidden = !p;
     pushLayer('chat');
     showScreen('rdChat');
@@ -983,17 +1044,105 @@ function markRead() {
 function exitSel() {
     selMode = false; sel.clear();
     $('rdHead').hidden = false; $('rdSelBar').hidden = true;
+    const rb = $('rdReactBar'); if (rb) rb.remove();
     if (curChat) redraw();
 }
 function updateSel() {
     selMode = true;
     $('rdHead').hidden = true; $('rdSelBar').hidden = false;
-    $('rdSelCount').textContent = sel.size + ' selected';
+    $('rdSelCount').textContent = String(sel.size);
+    const ms = Array.from(sel).map(getMsg).filter(Boolean);
+    $('rdSelCopy').hidden = !ms.some(m => m.text && !m.deleted);
+    $('rdSelFwd').hidden = !ms.some(m => !m.system && !m.deleted);
+    const one = ms.length === 1 ? ms[0] : null;
+    $('rdSelMore').hidden = !(ms.length && ms.every(m => m.from === 'me' && !m.deleted && !m.system));
     redraw();
 }
 function toggleSel(id) {
     if (sel.has(id)) sel.delete(id); else sel.add(id);
     if (!sel.size) exitSel(); else updateSel();
+}
+// ek message select ho to uske upar reaction bar (7 emoji + ＋)
+function positionReactBar() {
+    let rb = $('rdReactBar');
+    const m = (selMode && sel.size === 1) ? getMsg(Array.from(sel)[0]) : null;
+    if (!m || m.deleted || m.system || !curChat) { if (rb) rb.remove(); return; }
+    const row = document.querySelector('#rdMsgs .rd-row[data-id="' + m.id + '"]');
+    if (!row) { if (rb) rb.remove(); return; }
+    if (!rb) {
+        rb = document.createElement('div');
+        rb.id = 'rdReactBar'; rb.className = 'rd-reacts';
+        rb.innerHTML = REACTS.map(x => '<button data-react="' + x + '">' + x + '</button>').join('') + '<button data-react-more="1" style="font-size:22px;font-weight:700;color:var(--sub)">＋</button>';
+        $('rdApp').appendChild(rb);
+    }
+    const mine = (m.reactions && m.reactions.me) || '';
+    rb.querySelectorAll('[data-react]').forEach(b => b.classList.toggle('on', b.dataset.react === mine));
+    const r = row.getBoundingClientRect();
+    const top = Math.max(70, Math.min(r.top - 56, window.innerHeight - 140));
+    rb.style.top = top + 'px';
+    rb.style.left = m.from === 'me' ? 'auto' : '12px';
+    rb.style.right = m.from === 'me' ? '12px' : 'auto';
+    rb.style.transform = 'none';
+    rb.style.display = (r.bottom < 60 || r.top > window.innerHeight - 90) ? 'none' : 'flex';
+}
+async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (x) {}
+        ta.remove();
+    }
+    toast('Copied ✓');
+}
+function copySelected() {
+    const t = Array.from(sel).map(getMsg).filter(m => m && !m.deleted && m.text).sort((a, b) => a.ts - b.ts).map(m => m.text).join('\n');
+    if (!t) { toast('Copy karne ke liye text nahi hai'); return; }
+    copyText(t);
+    exitSel();
+}
+function openForward() {
+    const ids = Array.from(sel);
+    if (!ids.length) return;
+    fwdIds = ids;
+    openLayerUI('<div class="rd-pop" style="top:90px;left:18px;right:18px"><div class="ttl">Forward to…</div>' +
+        ['p2p', 'tg', 'saved'].map(w => '<button class="rd-fwd-item" data-fwd="' + w + '">' + avHTML(w).replace('data-avof', 'data-x') + '<span style="font-size:17px;font-weight:600">' + esc(chatName(w)) + '</span></button>').join('') + '</div>');
+}
+let fwdIds = [];
+async function doForward(to) {
+    const list = fwdIds.map(getMsg).filter(m => m && !m.deleted && !m.system).sort((a, b) => a.ts - b.ts);
+    closeLayerUI(); exitSel();
+    let fail = 0;
+    for (const m of list) {
+        let file = null;
+        if (m.media && !m.media.failed) {
+            const b = memBlobs[m.id] || await dbGet('blobs', m.id);
+            if (b) file = new File([b], m.media.name || 'file', { type: m.media.type || '' });
+            else if (m.media.url) { try { const r = await fetch(m.media.url); file = new File([await r.blob()], m.media.name || 'file', { type: m.media.type || '' }); } catch (e) {} }
+            if (!file) { fail++; continue; }
+        } else if (m.media) { fail++; continue; }
+        if (to === 'p2p') await p2pSend({ text: m.text, file, voice: m.voice, fwd: true });
+        else if (to === 'tg') { if (file) await tgSendFile(file, m.voice); if (m.text) await tgSendText(m.text); }
+        else await savedAdd({ text: m.text, file, voice: m.voice, fwd: true });
+    }
+    toast(fail ? ('Forward hua, ' + fail + ' file nahi ja saki') : ('Forwarded to ' + chatName(to) + ' ✓'));
+    renderList();
+}
+function likeMsg(id) {
+    const m = getMsg(id);
+    if (!m || m.deleted || m.system) return;
+    sendReact(m, (m.reactions && m.reactions.me === '❤️') ? null : '❤️');
+    if (navigator.vibrate) navigator.vibrate(15);
+}
+function openSelMore() {
+    const ms = Array.from(sel).map(getMsg).filter(Boolean);
+    if (!ms.length) return;
+    const acts = [];
+    if (ms.length === 1 && ms[0].text && !ms[0].media && !ms[0].voice) acts.push(['edit', ic('edit', 20) + 'Edit']);
+    if (ms.every(m => m.chat !== 'saved')) acts.push(['unsend', ic('undo', 20) + 'Unsend']);
+    if (!acts.length) { toast('Is message par koi option nahi'); return; }
+    openLayerUI('<div class="rd-pop" style="top:56px;right:10px">' + acts.map(a => '<button data-selmore="' + a[0] + '">' + a[1] + '</button>').join('') + '</div>');
 }
 function openLayerUI(html) {
     const L = $('rdLayer');
@@ -1024,7 +1173,10 @@ function openCtx(id, row) {
     openLayerUI(html);
 }
 function openMenu() {
-    openLayerUI('<div class="rd-pop" style="top:56px;right:10px"><button data-menu="select">' + ic('list', 20) + 'Select messages</button><button data-menu="clear">' + ic('trash', 20) + 'Clear chat</button></div>');
+    const items = [];
+    if (curChat === 'p2p' || curChat === 'tg') items.push(['profile', 'user', 'Profile']);
+    items.push(['select', 'list', 'Select messages'], ['bg', 'palette', 'Chat background'], ['clear', 'trash', 'Delete chat']);
+    openLayerUI('<div class="rd-pop" style="top:56px;right:10px">' + items.map(i => '<button data-menu="' + i[0] + '">' + ic(i[1], 20) + i[2] + '</button>').join('') + '</div>');
 }
 function openSheet() {
     const it = (k, color, icon, label) => '<button data-sheet="' + k + '"><i style="background:' + color + '">' + ic(icon, 24) + '</i>' + label + '</button>';
@@ -1041,7 +1193,7 @@ function openViewer(src) {
     pushLayer('viewer');
 }
 function openAvatarViewer(which) {
-    if (which === 'p2p' && photoURL) { openViewer(photoURL); return; }
+    if ((which === 'p2p' || which === 'tg') && photos[which]) { openViewer(photos[which]); return; }
     const L = $('rdViewerLetter');
     paintAv(L, which, 'big');
     L.hidden = false;
@@ -1049,9 +1201,12 @@ function openAvatarViewer(which) {
     $('rdViewer').hidden = false;
     pushLayer('viewer');
 }
-function openProfile() {
-    if (curChat !== 'p2p') return;
+function openProfile(which) {
+    which = (typeof which === 'string') ? which : curChat;
+    if (which !== 'p2p' && which !== 'tg') return;
+    profChat = which;
     applyNames(); updateSub();
+    if ($('rdNickIn')) setNickRow(false);
     pushLayer('profile');
     showScreen('rdProfile');
 }
@@ -1059,7 +1214,7 @@ function setNickRow(editing) {
     const row = $('rdNickRow');
     if (editing) {
         row.innerHTML = '<input id="rdNickIn" type="text" maxlength="40" placeholder="Nickname" autocomplete="off"><button id="rdNickOk">' + ic('check', 24) + '</button>';
-        const inp = $('rdNickIn'); inp.value = nick; inp.focus();
+        const inp = $('rdNickIn'); inp.value = nicks[profChat]; inp.focus();
         $('rdNickOk').onclick = saveNick;
         inp.onkeydown = e => { if (e.key === 'Enter') saveNick(); };
     } else {
@@ -1069,24 +1224,154 @@ function setNickRow(editing) {
     }
 }
 function saveNick() {
-    nick = ($('rdNickIn').value || '').trim();
-    dbPut('kv', nick, 'nick_' + PEER);
+    nicks[profChat] = ($('rdNickIn').value || '').trim();
+    dbPut('kv', nicks[profChat], 'nick_' + pkey(profChat));
     setNickRow(false); renderList();
 }
 function cancelNick() { if ($('rdNickIn')) setNickRow(false); }
-async function setPhoto(file) {
+function setPhoto(file) {
+    if (!file) return;
+    const w = profChat;
+    startCrop(file, async blob => {
+        if (!blob) return;
+        await dbPut('blobs', blob, 'photo_' + pkey(w));
+        await loadProfile();
+        toast('Profile photo set ✓');
+    });
+}
+
+/* ---- photo cropper (circle preview, pan / zoom / rotate) ---- */
+const crop = { img: null, rot: 0, scale: 1, min: 1, tx: 0, ty: 0, S: 300, dpr: 1, cb: null, pts: new Map(), pd: 0 };
+async function startCrop(file, cb) {
+    let bmp;
+    try { bmp = await createImageBitmap(file); } catch (e) { toast('Photo open nahi hui'); return; }
+    crop.img = bmp; crop.rot = 0; crop.cb = cb; crop.pts.clear();
+    $('rdCrop').hidden = false;
+    pushLayer('crop');
+    const S = Math.max(220, Math.min(window.innerWidth - 40, Math.floor(window.innerHeight * 0.52), 460));
+    crop.S = S; crop.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const box = $('rdCropBox'); box.style.width = S + 'px'; box.style.height = S + 'px';
+    const cv = $('rdCropCv'); cv.width = Math.round(S * crop.dpr); cv.height = Math.round(S * crop.dpr);
+    $('rdCropZoom').value = 1;
+    cropReset(); cropDraw();
+}
+function cropDims() { const r = crop.rot % 180 !== 0; return { w: r ? crop.img.height : crop.img.width, h: r ? crop.img.width : crop.img.height }; }
+function cropReset() {
+    const d = cropDims();
+    crop.min = Math.max(crop.S / d.w, crop.S / d.h);
+    crop.scale = crop.min; crop.tx = 0; crop.ty = 0;
+    $('rdCropZoom').value = 1;
+}
+function cropClamp() {
+    const d = cropDims();
+    const mx = Math.max(0, (d.w * crop.scale - crop.S) / 2), my = Math.max(0, (d.h * crop.scale - crop.S) / 2);
+    crop.tx = Math.min(mx, Math.max(-mx, crop.tx));
+    crop.ty = Math.min(my, Math.max(-my, crop.ty));
+}
+function cropPaint(ctx, px) {
+    const k = px / crop.S;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, px, px);
+    ctx.save();
+    ctx.translate(px / 2 + crop.tx * k, px / 2 + crop.ty * k);
+    ctx.rotate(crop.rot * Math.PI / 180);
+    ctx.scale(crop.scale * k, crop.scale * k);
+    ctx.drawImage(crop.img, -crop.img.width / 2, -crop.img.height / 2);
+    ctx.restore();
+}
+function cropDraw() {
+    if (!crop.img) return;
+    cropClamp();
+    const cv = $('rdCropCv'), ctx = cv.getContext('2d');
+    cropPaint(ctx, cv.width);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.beginPath(); ctx.rect(0, 0, cv.width, cv.width); ctx.arc(cv.width / 2, cv.width / 2, cv.width / 2, 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
+    ctx.restore();
+}
+function cropSetScale(sc) {
+    crop.scale = Math.min(crop.min * 4, Math.max(crop.min, sc));
+    $('rdCropZoom').value = (crop.scale / crop.min).toFixed(2);
+    cropDraw();
+}
+function cropWire() {
+    const box = $('rdCropBox');
+    box.addEventListener('pointerdown', e => { box.setPointerCapture(e.pointerId); crop.pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); crop.pd = 0; });
+    box.addEventListener('pointermove', e => {
+        const prev = crop.pts.get(e.pointerId);
+        if (!prev) return;
+        const cur = { x: e.clientX, y: e.clientY };
+        if (crop.pts.size === 1) { crop.tx += cur.x - prev.x; crop.ty += cur.y - prev.y; crop.pts.set(e.pointerId, cur); cropDraw(); }
+        else {
+            crop.pts.set(e.pointerId, cur);
+            const [a, b] = Array.from(crop.pts.values());
+            const d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (crop.pd) cropSetScale(crop.scale * d / crop.pd);
+            crop.pd = d;
+        }
+    });
+    const up = e => { crop.pts.delete(e.pointerId); crop.pd = 0; };
+    box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+    box.addEventListener('wheel', e => { e.preventDefault(); cropSetScale(crop.scale * (e.deltaY < 0 ? 1.08 : 0.92)); }, { passive: false });
+    $('rdCropZoom').addEventListener('input', e => cropSetScale(crop.min * Number(e.target.value)));
+    $('rdCropRot').addEventListener('click', () => { crop.rot = (crop.rot + 90) % 360; cropReset(); cropDraw(); });
+    $('rdCropBack').addEventListener('click', goBack);
+    $('rdCropOk').addEventListener('click', async () => {
+        const c = document.createElement('canvas'); c.width = c.height = 512;
+        cropPaint(c.getContext('2d'), 512);
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+        const cb = crop.cb;
+        goBack();
+        if (cb) cb(blob);
+    });
+}
+
+/* ---- chat background ---- */
+let bgId = 'auto', bgURL = null;
+const BGS = [
+    { id: 'auto', n: 'Default', st: 'background:#efeae2' },
+    { id: 'doodle', n: 'Doodle', col: '#efeae2', img: 'var(--wpb)' },
+    { id: 'doodlew', n: 'White', col: '#ffffff', img: 'var(--wpb)' },
+    { id: 'night', n: 'Night', col: '#0b141a', img: 'var(--wpw)' },
+    { id: 'white', n: 'Plain white', col: '#ffffff', img: 'none' },
+    { id: 'mint', n: 'Mint', col: '#dff3e4', img: 'none' },
+    { id: 'sky', n: 'Sky', col: '#dcecf9', img: 'none' },
+    { id: 'rose', n: 'Rose', col: '#f9e3ea', img: 'none' },
+    { id: 'black', n: 'Black', col: '#000000', img: 'none' }
+];
+function applyBg() {
+    const el = $('rdMsgs');
+    if (!el) return;
+    el.style.backgroundColor = ''; el.style.backgroundImage = ''; el.style.backgroundSize = '';
+    if (bgId === 'photo' && bgURL) { el.style.backgroundImage = 'url(' + bgURL + ')'; el.style.backgroundSize = 'cover'; el.style.backgroundPosition = 'center'; return; }
+    const b = BGS.find(x => x.id === bgId);
+    if (b && b.col) { el.style.backgroundColor = b.col; el.style.backgroundImage = b.img; }
+}
+function openBgSheet() {
+    const sw = BGS.map(b => {
+        const st = b.id === 'auto' ? 'background:#efeae2 var(--wpb)' : 'background-color:' + b.col + ';background-image:' + b.img + ';background-size:200px';
+        return '<div class="rd-bgsw' + (bgId === b.id ? ' on' : '') + '" data-bg="' + b.id + '" style="' + st + '"><span>' + b.n + '</span></div>';
+    }).join('');
+    const ph = '<div class="rd-bgsw' + (bgId === 'photo' ? ' on' : '') + '" data-bg="photo" style="background:#ddd' + (bgURL ? ' url(' + bgURL + ')' : '') + ';background-size:cover"><span>My photo</span></div>';
+    openLayerUI('<div class="rd-bgsheet"><h3>Chat background</h3><div class="rd-bggrid">' + sw + ph + '</div></div>');
+}
+function pickBg(id) {
+    if (id === 'photo') { $('rdFileBg').click(); return; }
+    bgId = id; dbPut('kv', id, 'bg'); applyBg(); closeLayerUI();
+}
+async function setBgPhoto(file) {
     if (!file) return;
     try {
         const bmp = await createImageBitmap(file);
-        const k = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
-        const c = document.createElement('canvas');
-        c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        const k = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
         c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
-        await dbPut('blobs', blob, 'photo_' + PEER);
-        await loadProfile();
-        toast('Profile photo set ✓');
-    } catch (e) { toast('Photo set nahi hui'); }
+        const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+        await dbPut('blobs', blob, 'bgphoto');
+        if (bgURL) URL.revokeObjectURL(bgURL);
+        bgURL = URL.createObjectURL(blob);
+        bgId = 'photo'; dbPut('kv', 'photo', 'bg'); applyBg(); closeLayerUI();
+    } catch (e) { toast('Background set nahi hua'); }
 }
 function startEdit(id) {
     const m = getMsg(id);
