@@ -79,7 +79,18 @@ const EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','
 const CHUNK = 16 * 1024;
 const MAX_DB_FILE = 50 * 1024 * 1024;
 const MAX_P2P_FILE = 200 * 1024 * 1024;
-const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+// STUN + TURN. Mobile data (Jio/Airtel) par direct P2P ke liye TURN zaruri hota hai.
+// Neeche wale free public TURN best-effort hain. Pakka chahiye to metered.ca par free account banao
+// aur apna username/credential yaha daalo.
+const TURN_USER = 'openrelayproject';
+const TURN_PASS = 'openrelayproject';
+const ICE = {
+    iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+        { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443?transport=tcp'], username: TURN_USER, credential: TURN_PASS }
+    ],
+    iceCandidatePoolSize: 2
+};
 
 /* ------------------------------ HELPERS ------------------------------ */
 const $ = id => document.getElementById(id);
@@ -310,6 +321,7 @@ function startRealtime() {
         .on('broadcast', { event: 'signal' }, m => onSignal(m.payload))
         .on('broadcast', { event: 'call' }, m => onCallMsg(m.payload))
         .on('broadcast', { event: 'poke' }, () => fetchPending())
+        .on('broadcast', { event: 'evt' }, m => { if (m.payload) handleEvt(m.payload).catch(() => {}); })
         .subscribe(st => {
             if (st === 'SUBSCRIBED') { chanReady = true; channel.track({ at: Date.now() }); }
             else if (st === 'CLOSED' || st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') chanReady = false;
@@ -367,6 +379,8 @@ async function insertEvt(evt) {
 }
 async function sendEvt(evt) {
     if (dcOpen()) { try { dc.send(JSON.stringify(evt)); return true; } catch (e) {} }
+    // fast path: samne wala online hai par P2P nahi bana -> realtime channel se turant (DB nahi)
+    if (peerOnline && chanReady && !evt.media) { bsend('evt', evt); return true; }
     return await insertEvt(evt);
 }
 async function queueEvt(evt) {
@@ -406,7 +420,8 @@ function flushAll() {
 function dcOpen() { return !!dc && dc.readyState === 'open'; }
 function ensurePC() {
     if (pc || !appOpen) return;
-    const mypc = new RTCPeerConnection(ICE);
+    let mypc;
+    try { mypc = new RTCPeerConnection(ICE); } catch (e) { pc = null; return; }
     pc = mypc;
     dc = mypc.createDataChannel('chat', { negotiated: true, id: 0, ordered: true });
     setupDC(dc);
@@ -414,7 +429,7 @@ function ensurePC() {
         if (!e.candidate) return;
         candBuf.push(e.candidate.toJSON());
         clearTimeout(candTimer);
-        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) bsend('signal', { cands: c }); }, 150);
+        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) bsend('signal', { cands: c }); }, 60);
     };
     mypc.onnegotiationneeded = async () => {
         try {
@@ -427,13 +442,20 @@ function ensurePC() {
     mypc.ontrack = e => {
         const v = $('rdRemote');
         v.srcObject = (e.streams && e.streams[0]) || new MediaStream([e.track]);
-        v.play().catch(() => {});
-        if (call && call.state !== 'live') callLive();
+        playRemote();
+        if (call) { call.gotTrack = true; maybeLive(); }
+    };
+    mypc.oniceconnectionstatechange = () => {
+        if (mypc !== pc) return;
+        const s = mypc.iceConnectionState;
+        if (s === 'failed') { mypc._fails = (mypc._fails || 0) + 1; if (mypc._fails <= 2) { try { mypc.restartIce(); } catch (e) {} } }
+        else if (s === 'disconnected') { setTimeout(() => { if (mypc === pc && mypc.iceConnectionState === 'disconnected') { try { mypc.restartIce(); } catch (e) {} } }, 4000); }
     };
     mypc.onconnectionstatechange = () => {
         if (mypc !== pc) return;
         const s = mypc.connectionState;
-        if (s === 'failed' || s === 'closed') {
+        if (s === 'connected') maybeLive();
+        if (s === 'failed' && (mypc._fails || 0) > 2 || s === 'closed') {
             closePC();
             if (peerOnline) setTimeout(() => { if (peerOnline && !pc) ensurePC(); }, 1200);
         }
@@ -583,10 +605,11 @@ function enqueue(fn) { chain = chain.then(fn, fn); return chain; }
 function deliver(m) {
     if (busy.has(m.id) || m.status !== 'pending') return;
     busy.add(m.id);
-    enqueue(async () => {
+    const run = async () => {
         try { await deliverNow(m); } catch (e) {}
         busy.delete(m.id);
-    });
+    };
+    if (m.media) enqueue(run); else run(); // text kabhi badi file ke peeche nahi ruke
 }
 async function deliverNow(m) {
     if (m.deleted) return;
@@ -607,6 +630,16 @@ async function deliverNow(m) {
             setStatus(m, 'sent');
             return;
         } catch (e) { /* fall back to DB route */ }
+    }
+    // fast path: peer online hai par P2P nahi bana -> realtime channel (turant). 3.5s me delivered na aaye to DB se.
+    if (!m.media && peerOnline && chanReady) {
+        bsend('evt', evt);
+        setStatus(m, 'sent');
+        setTimeout(() => {
+            const x = getMsg(m.id);
+            if (x && !x.deleted && (RANK[x.status] || 0) < RANK.delivered) insertEvt(evt);
+        }, 3500);
+        return;
     }
     if (!sb || !navigator.onLine) return;
     try {
@@ -668,8 +701,9 @@ function sendFile(file, voice) {
     else p2pSend({ file, voice });
 }
 function sendTyping(on) {
-    if (curChat !== 'p2p' || !dcOpen()) return;
-    try { dc.send(JSON.stringify({ t: 'typing', on })); } catch (e) {}
+    if (curChat !== 'p2p') return;
+    if (dcOpen()) { try { dc.send(JSON.stringify({ t: 'typing', on })); } catch (e) {} }
+    else if (peerOnline && chanReady) bsend('evt', { t: 'typing', on });
 }
 function typingPing() {
     const now = Date.now();
@@ -992,14 +1026,35 @@ function startCall(kind) {
 }
 async function attachLocal() {
     try {
-        const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: call.kind === 'video' ? { facingMode: 'user' } : false });
+        const s = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: call.kind === 'video' ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false
+        });
         if (!call) { s.getTracks().forEach(t => t.stop()); return false; }
         call.stream = s;
-        $('rdLocal').srcObject = s;
+        const lv = $('rdLocal');
+        lv.srcObject = s; lv.muted = true;
+        lv.play().catch(() => {});
         ensurePC();
+        if (!pc) { toast('Is browser me call support nahi hai'); return false; }
         s.getTracks().forEach(t => pc.addTrack(t, s));
+        clearTimeout(call.watch);
+        call.watch = setTimeout(() => {
+            if (call && call.state !== 'live') { toast('Call connect nahi hui — network check karo'); endCall(true); }
+        }, 25000);
         return true;
     } catch (e) { toast('Mic / Camera permission allow karo'); return false; }
+}
+function playRemote() {
+    const v = $('rdRemote');
+    const p = v.play();
+    if (p && p.catch) p.catch(() => {
+        toast('Awaaz ke liye screen par ek baar tap karo');
+        $('rdCall').addEventListener('click', () => v.play().catch(() => {}), { once: true });
+    });
+}
+function maybeLive() {
+    if (call && call.state !== 'live' && call.gotTrack && pc && pc.connectionState === 'connected') callLive();
 }
 function onCallMsg(p) {
     if (!p || !appOpen) return;
@@ -1049,6 +1104,8 @@ function rejectCall() {
 }
 function callLive() {
     if (!call || call.state === 'live') return;
+    clearTimeout(call.watch);
+    playRemote();
     call.state = 'live';
     call.t0 = Date.now();
     setCallStatus('00:00');
@@ -1059,7 +1116,7 @@ function endCall(sendEnd, silent) {
     if (!call) return;
     const c = call;
     call = null;
-    clearTimeout(callTimer); clearInterval(callTick);
+    clearTimeout(callTimer); clearInterval(callTick); clearTimeout(c.watch);
     if (sendEnd) bsend('call', { a: 'end' });
     if (c.stream) c.stream.getTracks().forEach(t => t.stop());
     try { if (pc) pc.getSenders().forEach(s => { if (s.track) { try { pc.removeTrack(s); } catch (e) {} } }); } catch (e) {}
