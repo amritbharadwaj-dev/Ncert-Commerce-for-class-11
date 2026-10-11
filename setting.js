@@ -347,80 +347,131 @@ function leaveApp() {
     $('rdApp').hidden = true;
 }
 
-/* ------------------------------ SUPABASE: presence, signaling, offline queue ------------------------------ */
+/* ------------------------------ SUPABASE: devices, presence, signaling, offline queue ------------------------------ */
+const T_DEV = 'rd_devices';        // har device ka chhota record (last seen + multi-device delivery)
+const CLEAN_EVERY = 5 * 3600e3;    // har 5 ghante me server saaf (isse badal sakte ho: 10 * 3600e3)
+const KEEP_MS = 12 * 3600e3;       // server par koi bhi data isse zyada der nahi rukega
+const DEV_TTL = 7 * 864e5;         // 7 din se purani device ko message nahi bhejte
+let DEV = localStorage.getItem('rd_dev');
+if (!DEV) { DEV = Math.random().toString(36).slice(2, 10); try { localStorage.setItem('rd_dev', DEV); } catch (e) {} }
+let devReg = { radhe: {}, amrit: {} };
+let peerDevs = new Set(), selfDevs = new Set(), linkDev = null, linkOverride = null;
+let forceRelay = false, lastResetAt = 0, lastRx = 0, pingT = null, statTimer = null;
+const seenEvt = new Map();
+
 function initNet() {
     if (!sb && window.supabase && window.supabase.createClient) {
         try {
             sb = window.supabase.createClient(SB_URL, SB_KEY, {
                 auth: { persistSession: false, autoRefreshToken: false },
-                realtime: { params: { eventsPerSecond: 20 } }
+                realtime: { params: { eventsPerSecond: 25 } }
             });
         } catch (e) { sb = null; }
     }
     if (!sb) { updateSub(); return; }
     startRealtime();
     touchLastSeen();
-    loadLastSeen();
+    loadDevices();
     fetchPending();
     flushAll();
+    maybeClean();
     clearInterval(hbTimer);
-    hbTimer = setInterval(() => { if (!document.hidden) touchLastSeen(); }, 90000);
+    hbTimer = setInterval(() => { if (!document.hidden) touchLastSeen(); }, 45000);
     clearInterval(fetchTimer);
-    fetchTimer = setInterval(() => { if (!document.hidden && !dcOpen()) fetchPending(); }, 25000);
+    fetchTimer = setInterval(() => { if (!document.hidden) { fetchPending(); maybeClean(); } }, 12000);
+    clearInterval(statTimer);
+    statTimer = setInterval(() => { if (!document.hidden) syncStatus(); }, 6000);
 }
 function stopNet() {
-    clearInterval(hbTimer); clearInterval(fetchTimer);
+    clearInterval(hbTimer); clearInterval(fetchTimer); clearInterval(statTimer);
     touchLastSeen();
     closePC();
     if (channel && sb) { try { sb.removeChannel(channel); } catch (e) {} }
     channel = null; chanReady = false; peerOnline = false;
+    peerDevs = new Set(); selfDevs = new Set(); linkDev = null; linkOverride = null;
 }
 function startRealtime() {
     if (channel || !sb) return;
-    channel = sb.channel('rd-room', { config: { presence: { key: ME }, broadcast: { self: false } } });
+    channel = sb.channel('rd-room', { config: { presence: { key: ME + '|' + DEV }, broadcast: { self: false } } });
     channel
         .on('presence', { event: 'sync' }, onPresence)
         .on('broadcast', { event: 'signal' }, m => onSignal(m.payload))
         .on('broadcast', { event: 'call' }, m => onCallMsg(m.payload))
-        .on('broadcast', { event: 'poke' }, () => fetchPending())
-        .on('broadcast', { event: 'evt' }, m => { if (m.payload) handleEvt(m.payload).catch(() => {}); })
+        .on('broadcast', { event: 'poke' }, m => { const p = m.payload; if (p && p.to && !p.to.includes(DEV)) return; fetchPending(); })
+        .on('broadcast', { event: 'evt' }, m => {
+            const p = m.payload;
+            if (!p) return;
+            if (p.to && !p.to.includes(DEV)) return;
+            handleEvt(p).catch(() => {});
+        })
         .subscribe(st => {
-            if (st === 'SUBSCRIBED') { chanReady = true; channel.track({ at: Date.now() }); }
+            if (st === 'SUBSCRIBED') { chanReady = true; channel.track({ at: Date.now(), u: ME, d: DEV }); fetchPending(); }
             else if (st === 'CLOSED' || st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') chanReady = false;
         });
 }
 function bsend(ev, payload) {
     if (channel && chanReady) { try { channel.send({ type: 'broadcast', event: ev, payload }); } catch (e) {} }
 }
+function bcall(p) { bsend('call', Object.assign({ fu: ME, fd: DEV, cid: call && call.id, td: call && call.peerDev }, p)); }
+function noteDev(u, d) { if (devReg[u] && d) devReg[u][d] = Date.now(); }
+function minDev(set, extra) { const a = Array.from(set); if (extra) a.push(extra); return a.sort()[0]; }
+function evalLink() {
+    // har taraf ka sabse chhota device id P2P banata hai; baaki devices server se message pate hain
+    const myPrimary = minDev(selfDevs, DEV);
+    const peerPrimary = peerDevs.size ? minDev(peerDevs) : null;
+    let want = (peerPrimary && myPrimary === DEV) ? peerPrimary : null;
+    if (linkOverride && peerDevs.has(linkOverride)) want = linkOverride;
+    if (want !== linkDev) { if (pc) closePC(); linkDev = want; }
+    if (linkDev && !pc) ensurePC();
+}
 function onPresence() {
     if (!channel) return;
-    const now = !!channel.presenceState()[PEER];
-    if (now === peerOnline) return;
-    peerOnline = now;
-    if (now) { ensurePC(); fetchPending(); flushAll(); }
-    else {
+    const st = channel.presenceState();
+    const pd = new Set(), sd = new Set();
+    Object.keys(st).forEach(k => {
+        const i = k.indexOf('|');
+        if (i < 0) return;
+        const u = k.slice(0, i), d = k.slice(i + 1);
+        if (u === PEER) pd.add(d); else if (u === ME && d !== DEV) sd.add(d);
+    });
+    const was = peerOnline;
+    const newPeerDev = Array.from(pd).some(d => !peerDevs.has(d));
+    const newSelfDev = Array.from(sd).some(d => !selfDevs.has(d));
+    peerDevs = pd; selfDevs = sd; peerOnline = pd.size > 0;
+    pd.forEach(d => noteDev(PEER, d)); sd.forEach(d => noteDev(ME, d));
+    evalLink();
+    if (peerOnline && !was) { fetchPending(); flushAll(); syncStatus(); }
+    if (!peerOnline && was) {
         closePC();
         if (call) endCall(false);
         peerLastSeen = Date.now();
-        setTimeout(loadLastSeen, 1500);
+        forceRelay = false;
+        setTimeout(loadDevices, 1500);
     }
+    if (newPeerDev || newSelfDev) { sendProfileHello(); }
     updateSub(); renderList();
 }
 function touchLastSeen() {
     if (!sb || !ME || !navigator.onLine) return;
-    try { sb.from(T_PRES).upsert({ user_id: ME, last_seen: new Date().toISOString() }).then(() => {}, () => {}); } catch (e) {}
+    try { sb.from(T_DEV).upsert({ id: ME + '|' + DEV, user_id: ME, dev_id: DEV, last_seen: new Date().toISOString() }).then(() => {}, () => {}); } catch (e) {}
 }
-async function loadLastSeen() {
+async function loadDevices() {
     if (!sb || !PEER) return;
     try {
-        const { data } = await sb.from(T_PRES).select('last_seen').eq('user_id', PEER).maybeSingle();
-        if (data && data.last_seen) {
-            const t = new Date(data.last_seen).getTime();
-            if (!peerLastSeen || t > peerLastSeen - 5000 || !peerOnline) peerLastSeen = t;
-            updateSub();
-        }
+        const since = new Date(Date.now() - DEV_TTL).toISOString();
+        const { data } = await sb.from(T_DEV).select('user_id,dev_id,last_seen').gte('last_seen', since);
+        if (!data) return;
+        let ls = 0;
+        data.forEach(r => {
+            const t = new Date(r.last_seen).getTime();
+            if (devReg[r.user_id]) devReg[r.user_id][r.dev_id] = Math.max(devReg[r.user_id][r.dev_id] || 0, t);
+            if (r.user_id === PEER) ls = Math.max(ls, t);
+        });
+        if (ls && !peerOnline) peerLastSeen = ls;
+        updateSub();
     } catch (e) {}
 }
+const loadLastSeen = loadDevices;
 function lastSeenText() {
     if (!peerLastSeen) return 'offline';
     const t = fmtTime(peerLastSeen), k = dayKey(peerLastSeen), now = Date.now();
@@ -429,61 +480,189 @@ function lastSeenText() {
     return 'last seen ' + new Date(peerLastSeen).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' at ' + t;
 }
 
-/* ---- offline delivery: ek event DB me jaata hai, receiver ke lene ke baad delete ho jaata hai ---- */
-async function insertEvt(evt) {
-    if (!sb || !navigator.onLine || !ME) return false;
+/* ---- routing: ek event ko samne wale ke SAARE devices (aur apne dusre devices) tak pahunchana ----
+   P2P chal raha ho to us device ko seedha; baaki online devices ko realtime channel se turant;
+   offline devices ke liye server (DB) me alag-alag row (jo device ke utha lene par delete ho jaati hai). */
+function devsOf(which) {
+    const u = which === 'self' ? ME : PEER;
+    const set = new Set();
+    const now = Date.now();
+    Object.keys(devReg[u] || {}).forEach(d => { if (now - devReg[u][d] < DEV_TTL) set.add(d); });
+    (which === 'self' ? selfDevs : peerDevs).forEach(d => set.add(d));
+    set.delete(DEV);
+    return set;
+}
+async function insertRows(e, u, devs) {
+    if (!sb || !navigator.onLine || !devs.length) return false;
+    const rows = devs.map(d => ({ id: e.id + '~' + d, from_user: ME, to_user: u, to_dev: d, payload: e }));
     try {
-        const { error } = await sb.from(T_MSG).insert({ id: evt.id, from_user: ME, to_user: PEER, payload: evt });
-        if (error) return error.code === '23505';
-        if (peerOnline) bsend('poke', {});
+        let { error } = await sb.from(T_MSG).insert(rows);
+        if (error) {
+            if (error.code !== '23505') return false;
+            let any = false;
+            for (const r of rows) { const x = await sb.from(T_MSG).insert(r); if (!x.error || x.error.code === '23505') any = true; }
+            error = any ? null : error;
+            if (error) return false;
+        }
+        const online = (u === PEER) ? peerDevs : selfDevs;
+        const live = devs.filter(d => online.has(d));
+        if (live.length) bsend('poke', { to: live });
         return true;
-    } catch (e) { return false; }
+    } catch (x) { return false; }
 }
-async function sendEvt(evt) {
-    if (dcOpen()) { try { dc.send(JSON.stringify(evt)); return true; } catch (e) {} }
-    // fast path: samne wala online hai par P2P nahi bana -> realtime channel se turant (DB nahi)
-    if (peerOnline && chanReady && !evt.media) { bsend('evt', evt); return true; }
-    return await insertEvt(evt);
+async function route(evt, o) {
+    o = o || {};
+    const which = o.to === 'self' ? 'self' : 'peer';
+    const u = which === 'self' ? ME : PEER;
+    const online = which === 'self' ? selfDevs : peerDevs;
+    const devs = devsOf(which);
+    const e = Object.assign({}, evt, { fu: ME, fd: DEV });
+    if (which === 'self') e.mirror = true;
+    let ok = false;
+    const bc = [], dbd = [];
+    devs.forEach(d => {
+        if (o.skip && d === o.skip) return;
+        if (which === 'peer' && d === linkDev && dcOpen() && !o.viaDB) {
+            try { dc.send(JSON.stringify(e)); ok = true; return; } catch (x) {}
+        }
+        const live = online.has(d) && chanReady;
+        if (live && !evt.media && !o.viaDB) bc.push(d);
+        if (!o.ephemeral && (!live || evt.media || o.viaDB || o.both)) dbd.push(d);
+    });
+    if (bc.length) { bsend('evt', Object.assign({}, e, { to: bc })); ok = true; }
+    if (dbd.length) { if (await insertRows(e, u, dbd)) ok = true; }
+    if (!devs.size && !o.ephemeral && which === 'peer') { if (await insertRows(e, u, ['*'])) ok = true; }
+    return ok;
 }
-async function queueEvt(evt) {
-    if (!(await sendEvt(evt))) { outbox.push(evt); dbPut('kv', outbox, 'outbox'); }
+async function queueEvt(evt, o) {
+    if (!(await route(evt, o))) {
+        if (o && o.ephemeral) return;
+        outbox.push({ evt, o: o || {} }); dbPut('kv', outbox, 'outbox');
+    }
 }
+function act(evt) { queueEvt(evt); if (devsOf('self').size) queueEvt(Object.assign({}, evt, { id: evt.id + 'm' }), { to: 'self' }); }
 async function flushOutbox() {
     if (!outbox.length) return;
     const list = outbox.splice(0);
-    for (const ev of list) { if (!(await sendEvt(ev))) outbox.push(ev); }
+    for (const it of list) { const ev = it.evt || it; const o = it.o || {}; if (!(await route(ev, o))) outbox.push({ evt: ev, o }); }
     dbPut('kv', outbox, 'outbox');
 }
 async function fetchPending() {
     if (!sb || !ME || !navigator.onLine || fetching || !appOpen) return;
     fetching = true;
     try {
-        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).order('created_at', { ascending: true });
-        if (error || !data || !data.length) { fetching = false; return; }
-        const done = [];
-        for (const row of data) {
-            try { await handleEvt(row.payload); done.push(row); } catch (e) {}
-        }
-        if (done.length) {
-            await sb.from(T_MSG).delete().in('id', done.map(r => r.id));
-            const paths = done.map(r => r.payload && r.payload.media && r.payload.media.path).filter(Boolean);
-            if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).in('to_dev', [DEV, '*']).order('created_at', { ascending: true }).limit(200);
+        if (!error && data && data.length) {
+            const done = [];
+            for (const row of data) {
+                try { await handleEvt(row.payload); done.push(row); } catch (e) { /* agli baar dobara */ }
+            }
+            if (done.length) {
+                await sb.from(T_MSG).delete().in('id', done.map(r => r.id));
+                cleanMedia(done);
+            }
+            if (data.length >= 200) setTimeout(fetchPending, 300);
         }
     } catch (e) {}
     fetching = false;
+}
+async function cleanMedia(rows) {
+    for (const r of rows) {
+        const p = r.payload && r.payload.media && r.payload.media.path;
+        if (!p) continue;
+        try {
+            const base = String(r.id).split('~')[0];
+            const { count } = await sb.from(T_MSG).select('id', { count: 'exact', head: true }).like('id', base + '~%');
+            if (!count) await sb.storage.from(BUCKET).remove([p]); // sab devices le chuke -> file server se hata do
+        } catch (e) {}
+    }
+}
+/* ---- server saaf: data pehle phone ke local storage me aa chuka hota hai, phir server se delete ---- */
+async function maybeClean(force) {
+    if (!sb || !ME || !navigator.onLine) return 0;
+    const last = Number(localStorage.getItem('rd_clean_ts') || 0);
+    if (!force && Date.now() - last < CLEAN_EVERY) return 0;
+    localStorage.setItem('rd_clean_ts', String(Date.now()));
+    return cleanupSupabase(KEEP_MS);
+}
+async function cleanupSupabase(keep) {
+    if (!sb) return 0;
+    let n = 0;
+    keep = keep == null ? KEEP_MS : keep;
+    try {
+        await fetchPending(); // apne device ka sab data pehle local storage me
+        const cut = new Date(Date.now() - keep).toISOString();
+        const old = await sb.from(T_MSG).select('id,payload').lt('created_at', cut).limit(1000);
+        if (old.data && old.data.length) {
+            const paths = old.data.map(r => r.payload && r.payload.media && r.payload.media.path).filter(Boolean);
+            await sb.from(T_MSG).delete().in('id', old.data.map(r => r.id));
+            n += old.data.length;
+            if (paths.length) await sb.storage.from(BUCKET).remove(Array.from(new Set(paths)));
+        }
+        for (const u of ['radhe', 'amrit']) {
+            const { data: files } = await sb.storage.from(BUCKET).list(u, { limit: 1000 });
+            const dead = (files || []).filter(f => f.created_at && new Date(f.created_at).getTime() < Date.now() - keep).map(f => u + '/' + f.name);
+            if (dead.length) { await sb.storage.from(BUCKET).remove(dead); n += dead.length; }
+        }
+        await sb.from(T_DEV).delete().lt('last_seen', new Date(Date.now() - 14 * 864e5).toISOString());
+    } catch (e) {}
+    return n;
 }
 function flushAll() {
     flushOutbox();
     msgs.forEach(m => { if (m.chat === 'p2p' && m.from === 'me' && m.status === 'pending' && !m.local) deliver(m); });
     tgFlush();
 }
+/* ---- tick sync: bheje hue messages ka asli status samne wale se poochho (blue tick kabhi na chhute) ---- */
+function syncStatus() {
+    if (!appOpen || !(peerOnline || dcOpen())) return;
+    const ids = [];
+    for (let i = msgs.length - 1; i >= 0 && ids.length < 150; i--) {
+        const m = msgs[i];
+        if (m.chat === 'p2p' && m.from === 'me' && !m.system && !m.deleted && m.status !== 'seen' && m.status !== 'pending') ids.push(m.id);
+    }
+    if (ids.length) route({ t: 'sts', id: uid(), ids }, { ephemeral: true });
+}
+function answerStatus(ids) {
+    const seen = [], del = [];
+    (ids || []).forEach(id => { const m = getMsg(id); if (m && m.from === 'peer' && !m.system) (m.read ? seen : del).push(id); });
+    if (seen.length) queueEvt({ t: 'ack', id: uid(), ids: seen, s: 'seen' });
+    if (del.length) queueEvt({ t: 'ack', id: uid(), ids: del, s: 'delivered' });
+}
 
 /* ------------------------------ WEBRTC (peer to peer) ------------------------------ */
 function dcOpen() { return !!dc && dc.readyState === 'open'; }
+function sig(p) { bsend('signal', Object.assign({ fd: DEV, td: linkDev }, p)); }
+function iceConfig() { return forceRelay ? Object.assign({}, ICE, { iceTransportPolicy: 'relay' }) : ICE; }
+function rebind(dev) { linkOverride = dev || null; evalLink(); }
+function requestReset(relay) {
+    const now = Date.now();
+    if (now - lastResetAt < 4000) return;
+    lastResetAt = now;
+    if (ME === 'amrit') doReset(relay); else sig({ want: 'reset', relay: !!relay });
+}
+function doReset(relay) {
+    forceRelay = !!relay;
+    sig({ reset: true, relay: forceRelay });
+    closePC();
+    setTimeout(() => { if (linkDev && !pc) ensurePC(); }, 250);
+}
+function startKeepalive() {
+    stopKeepalive();
+    lastRx = Date.now();
+    pingT = setInterval(() => {
+        if (!dcOpen()) return;
+        try { dc.send('{"t":"ping"}'); } catch (e) {}
+        const idle = Date.now() - lastRx;
+        if (idle > 45000) requestReset(forceRelay);
+        else if (idle > 22000) { try { pc.restartIce(); } catch (e) {} }
+    }, 8000);
+}
+function stopKeepalive() { clearInterval(pingT); pingT = null; }
 function ensurePC() {
-    if (pc || !appOpen) return;
+    if (pc || !appOpen || !linkDev) return;
     let mypc;
-    try { mypc = new RTCPeerConnection(ICE); } catch (e) { pc = null; return; }
+    try { mypc = new RTCPeerConnection(iceConfig()); } catch (e) { pc = null; return; }
     pc = mypc;
     dc = mypc.createDataChannel('chat', { negotiated: true, id: 0, ordered: true });
     setupDC(dc);
@@ -491,7 +670,7 @@ function ensurePC() {
         if (!e.candidate) return;
         candBuf.push(e.candidate.toJSON());
         clearTimeout(candTimer);
-        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) bsend('signal', { cands: c }); }, 60);
+        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) sig({ cands: c }); }, 60);
     };
     mypc.onnegotiationneeded = async () => {
         try {
@@ -501,7 +680,7 @@ function ensurePC() {
             if (mypc.signalingState !== 'stable') return;
             await mypc.setLocalDescription(offer);
             if (mypc !== pc) return;
-            bsend('signal', { desc: { type: mypc.localDescription.type, sdp: mypc.localDescription.sdp } });
+            sig({ desc: { type: mypc.localDescription.type, sdp: mypc.localDescription.sdp } });
         } catch (e) {} finally { makingOffer = false; }
     };
     mypc.ontrack = e => {
@@ -523,24 +702,31 @@ function ensurePC() {
     mypc.onconnectionstatechange = () => {
         if (mypc !== pc) return;
         const s = mypc.connectionState;
-        if (s === 'connected') maybeLive();
-        if (s === 'failed' && (mypc._fails || 0) > 2 || s === 'closed') {
+        if (s === 'connected') { clearTimeout(mypc._wd); maybeLive(); }
+        if ((s === 'failed' && (mypc._fails || 0) > 2) || s === 'closed') {
             closePC();
-            if (peerOnline) setTimeout(() => { if (peerOnline && !pc) ensurePC(); }, 1200);
+            if (peerOnline && linkDev) setTimeout(() => requestReset(forceRelay), 800);
         }
         updateSub();
     };
+    // 12-16 second me connect na ho to TURN-relay mode me dobara (mobile data / strict NAT ke liye)
+    mypc._wd = setTimeout(() => { if (mypc === pc && mypc.connectionState !== 'connected' && linkDev) requestReset(!forceRelay); }, ME === 'amrit' ? 12000 : 16000);
 }
 function closePC() {
     const p = pc;
     pc = null;
+    stopKeepalive();
+    try { p && clearTimeout(p._wd); } catch (e) {}
     try { dc && dc.close(); } catch (e) {}
     try { p && p.close(); } catch (e) {}
-    dc = null; pendingCand = []; makingOffer = false; incoming.cur = null; remoteStream = null;
+    dc = null; pendingCand = []; candBuf = []; makingOffer = false; incoming.cur = null; remoteStream = null;
     updateSub(); renderList();
 }
 async function onSignal(p) {
     if (!p || !appOpen) return;
+    if (p.td !== DEV || !linkDev || p.fd !== linkDev) return;
+    if (p.want === 'reset') { if (ME === 'amrit') requestReset(p.relay); return; }
+    if (p.reset) { forceRelay = !!p.relay; closePC(); ensurePC(); return; }
     ensurePC();
     if (!pc) return;
     const polite = ME === 'radhe';
@@ -556,7 +742,7 @@ async function onSignal(p) {
                 const ans = await pc.createAnswer();
                 ans.sdp = tuneSDP(ans.sdp);
                 await pc.setLocalDescription(ans);
-                bsend('signal', { desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+                sig({ desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
             }
         } else if (p.cands) {
             for (const c of p.cands) {
@@ -568,13 +754,17 @@ async function onSignal(p) {
 }
 function setupDC(ch) {
     ch.binaryType = 'arraybuffer';
-    ch.onopen = () => { if (dc !== ch) return; updateSub(); renderList(); flushAll(); };
+    ch.onopen = () => {
+        if (dc !== ch) return;
+        try { clearTimeout(pc._wd); } catch (e) {}
+        startKeepalive(); updateSub(); renderList(); flushAll(); syncStatus();
+    };
     ch.onclose = () => {
         if (dc !== ch) return;
-        dropIncomplete();
+        stopKeepalive(); dropIncomplete();
         updateSub(); renderList();
     };
-    ch.onmessage = ev => onDC(ev.data);
+    ch.onmessage = ev => { lastRx = Date.now(); onDC(ev.data); };
 }
 function dropIncomplete() {
     incoming.cur = null;
@@ -604,6 +794,8 @@ function onDC(d) {
     }
     let e;
     try { e = JSON.parse(d); } catch (x) { return; }
+    if (e.t === 'ping') { try { dc.send('{"t":"pong"}'); } catch (x) {} return; }
+    if (e.t === 'pong') return;
     if (e.t === 'media-start') {
         const ex = getMsg(e.id);
         if (ex && !ex.rx) { incoming.cur = { skip: true, evt: e }; return; } // pehle se mil chuka hai
@@ -624,33 +816,46 @@ function onDC(d) {
     } else handleEvt(e).catch(() => {});
 }
 
-/* ------------------------------ EVENTS (msg / ack / edit / unsend / react / typing) ------------------------------ */
+/* ------------------------------ EVENTS (msg / ack / edit / unsend / react / typing / profile) ------------------------------ */
 async function handleEvt(e, blob) {
+    if (!e || !e.t) return;
+    const mine = e.fu === ME;      // meri apni dusri device se aaya (mirror)
+    if (e.id && e.t !== 'msg') {
+        if (seenEvt.has(e.id)) return;
+        seenEvt.set(e.id, 1);
+        if (seenEvt.size > 2000) seenEvt.delete(seenEvt.keys().next().value);
+    }
     switch (e.t) {
-        case 'msg': return onMsg(e, blob);
+        case 'msg': return onMsg(e, blob, mine);
         case 'ack':
             for (const id of (e.ids || [])) { const m = getMsg(id); if (m && m.from === 'me') setStatus(m, e.s); }
             return;
+        case 'sts':
+            if (!mine) answerStatus(e.ids);
+            return;
         case 'edit': {
             const m = getMsg(e.mid);
-            if (m && m.from === 'peer' && !m.deleted) { m.text = e.text; m.edited = true; saveMsg(m); redraw(); renderList(); }
+            if (m && !m.deleted && ((mine && m.from === 'me') || (!mine && m.from === 'peer'))) { m.text = e.text; m.edited = true; saveMsg(m); redraw(); renderList(); }
             return;
         }
         case 'unsend': {
             const m = getMsg(e.mid);
-            if (m && m.from === 'peer') wipe(m);
+            if (m && ((mine && m.from === 'me') || (!mine && m.from === 'peer'))) wipe(m);
             return;
         }
         case 'react': {
             const m = getMsg(e.mid);
-            if (m) {
-                m.reactions = m.reactions || {};
-                if (e.emoji) m.reactions.peer = e.emoji; else delete m.reactions.peer;
-                saveMsg(m); redraw();
-            }
+            if (m) applyReact(m, mine ? 'me' : 'peer', e.emoji || null);
             return;
         }
+        case 'readsync':
+            if (!mine) return;
+            (e.ids || []).forEach(id => { const m = getMsg(id); if (m && !m.read) { m.read = true; saveMsg(m); } });
+            renderList();
+            return;
+        case 'prof': return onProf(e, mine);
         case 'typing':
+            if (mine) return;
             peerTyping = !!e.on;
             clearTimeout(typingTimer);
             if (peerTyping) typingTimer = setTimeout(() => { peerTyping = false; updateSub(); renderList(); }, 3500);
@@ -658,9 +863,16 @@ async function handleEvt(e, blob) {
             return;
     }
 }
-async function onMsg(e, blob) {
-    if (getMsg(e.id)) { if (!e.system) ackMsg(e.id, 'delivered'); return; }
-    const m = { id: e.id, chat: 'p2p', from: 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, sk: e.sk || '', fwd: !!e.fwd, cl: e.cl ? Object.assign({}, e.cl, { dir: e.cl.dir === 'out' ? 'in' : 'out' }) : undefined, reply: e.reply ? { id: e.reply.id, who: e.reply.who === 'me' ? 'peer' : 'me', t: e.reply.t } : undefined, voice: !!e.voice, status: 'received', read: false, reactions: {} };
+async function onMsg(e, blob, mine) {
+    const ex = getMsg(e.id);
+    if (ex) { if (!mine && !e.system && ex.from === 'peer') ackMsg(e.id, ex.read ? 'seen' : 'delivered'); return; }
+    const m = {
+        id: e.id, chat: 'p2p', from: mine ? 'me' : 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, sk: e.sk || '',
+        fwd: !!e.fwd, album: e.al || undefined,
+        cl: e.cl ? (mine ? e.cl : Object.assign({}, e.cl, { dir: e.cl.dir === 'out' ? 'in' : 'out' })) : undefined,
+        reply: e.reply ? { id: e.reply.id, who: mine ? e.reply.who : (e.reply.who === 'me' ? 'peer' : 'me'), t: e.reply.t } : undefined,
+        voice: !!e.voice, status: mine ? 'sent' : 'received', read: !!mine, reactions: {}
+    };
     if (m.cl) m.text = clText(m.cl);
     if (e.media) {
         m.media = { name: e.media.name, type: e.media.type, size: e.media.size };
@@ -672,12 +884,18 @@ async function onMsg(e, blob) {
         if (blob) await dbPut('blobs', blob, m.id); else m.media.failed = true;
     }
     addMsg(m);
-    if (!m.system) {
-        if (curChat === 'p2p' && !document.hidden) { m.read = true; saveMsg(m); ackMsg(m.id, 'seen'); }
-        else ackMsg(m.id, 'delivered');
-    } else if (curChat === 'p2p' && !document.hidden) { m.read = true; saveMsg(m); }
+    const open = curChat === 'p2p' && !document.hidden;
+    if (!mine) {
+        if (!m.system) {
+            if (open) { m.read = true; saveMsg(m); ackMsg(m.id, 'seen'); readSync([m.id]); }
+            else ackMsg(m.id, 'delivered');
+        } else if (open) { m.read = true; saveMsg(m); }
+    }
     redraw(); renderList();
 }
+function onProf() {}
+function sendProfileHello() {}
+function readSync(ids) { if (ids.length && devsOf('self').size) route({ t: 'readsync', id: uid(), ids }, { to: 'self', ephemeral: true }); }
 function ackMsg(id, s) { queueEvt({ t: 'ack', id: uid(), ids: [id], s }); }
 function setStatus(m, s) {
     if ((RANK[s] || 0) <= (RANK[m.status] || 0)) return;
@@ -696,7 +914,7 @@ async function p2pSend(o) {
     const file = o.file;
     if (file && file.size > MAX_P2P_FILE) { toast('File bahut badi hai (1 GB limit)'); return; }
     if (file && file.size > MAX_DB_FILE && !dcOpen()) toast('Badi file — P2P connect hote hi jaayegi');
-    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: 'pending', reactions: {}, voice: !!o.voice, fwd: !!o.fwd, reply: o.reply || undefined };
+    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: 'pending', reactions: {}, voice: !!o.voice, fwd: !!o.fwd, reply: o.reply || undefined, album: o.album || undefined };
     if (file) {
         m.media = { name: file.name || ('file_' + Date.now()), type: file.type || 'application/octet-stream', size: file.size };
         memBlobs[m.id] = file;
@@ -728,15 +946,29 @@ function deliver(m) {
     };
     if (m.media) enqueue(run); else run(); // text kabhi badi file ke peeche nahi ruke
 }
+async function uploadMedia(m, evt) {
+    if (!sb || !navigator.onLine) return false;
+    const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
+    if (!blob || blob.size > MAX_DB_FILE) return false;
+    const safe = String(m.media.name).replace(/[^\w.\-]+/g, '_');
+    const path = ME + '/' + m.id + '_' + safe;
+    const up = () => sb.storage.from(BUCKET).upload(path, blob, { contentType: m.media.type || 'application/octet-stream', upsert: true });
+    let r = await up();
+    if (r.error) { await cleanupSupabase(); r = await up(); } // storage bhar gaya ho to saaf karke dobara
+    if (r.error) return false;
+    evt.media.path = path;
+    return true;
+}
 async function deliverNow(m) {
     if (m.deleted) return;
-    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, fwd: !!m.fwd, reply: m.reply || null, media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
-    if (dcOpen()) {
+    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, fwd: !!m.fwd, reply: m.reply || null, al: m.album || '', media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
+    let p2pOK = false;
+    if (dcOpen() && linkDev) {
         try {
             if (m.media) {
                 const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
                 if (!blob) throw new Error('no blob');
-                dc.send(JSON.stringify(Object.assign({}, evt, { t: 'media-start' })));
+                dc.send(JSON.stringify(Object.assign({}, evt, { t: 'media-start', fu: ME, fd: DEV })));
                 const total = blob.size;
                 m.prog = 0; redraw();
                 for (let o = 0; o < total; o += SLICE) {
@@ -752,41 +984,53 @@ async function deliverNow(m) {
                 }
                 dc.send(JSON.stringify({ t: 'media-end', id: m.id }));
                 delete m.prog;
-            } else dc.send(JSON.stringify(evt));
-            setStatus(m, 'sent');
-            return;
-        } catch (e) { delete m.prog; redraw(); /* DB route / dobara try */ }
+            } else dc.send(JSON.stringify(Object.assign({}, evt, { fu: ME, fd: DEV })));
+            p2pOK = true;
+        } catch (e) { delete m.prog; redraw(); }
     }
-    // fast path: peer online hai par P2P nahi bana -> realtime channel (turant). 3.5s me delivered na aaye to DB se.
-    if (!m.media && peerOnline && chanReady) {
-        bsend('evt', evt);
+    const peerT = devsOf('peer'), selfT = devsOf('self');
+    const otherPeer = Array.from(peerT).some(d => !(p2pOK && d === linkDev));
+    const needRows = otherPeer || (!p2pOK && !peerT.size);
+    let uploaded = !m.media;
+    if (m.media && (needRows || selfT.size)) uploaded = await uploadMedia(m, evt);
+    let routeOK = false;
+    if (needRows && uploaded) routeOK = await route(evt, { skip: p2pOK ? linkDev : null });
+    if (selfT.size && uploaded) route(evt, { to: 'self', both: true }); // meri dusri devices me bhi
+    if (p2pOK || routeOK) {
         setStatus(m, 'sent');
-        setTimeout(() => {
+        if (needRows && !routeOK && !m.media) { outbox.push({ evt, o: { skip: p2pOK ? linkDev : null } }); dbPut('kv', outbox, 'outbox'); }
+        if (!m.media) setTimeout(() => {
             const x = getMsg(m.id);
-            if (x && !x.deleted && (RANK[x.status] || 0) < RANK.delivered) insertEvt(evt);
-        }, 3500);
-        return;
+            if (x && !x.deleted && (RANK[x.status] || 0) < RANK.delivered) route(evt, { viaDB: true }); // 4.5s me delivered nahi aaya -> server se bhi
+        }, 4500);
+        setTimeout(syncStatus, 2500);
     }
-    if (!sb || !navigator.onLine) return;
-    try {
-        if (m.media) {
-            const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
-            if (!blob) return;
-            if (blob.size > MAX_DB_FILE) return;
-            const safe = String(m.media.name).replace(/[^\w.\-]+/g, '_');
-            const path = ME + '/' + m.id + '_' + safe;
-            const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: m.media.type || 'application/octet-stream', upsert: true });
-            if (error) return;
-            evt.media.path = path;
-        }
-        if (await insertEvt(evt)) setStatus(m, 'sent');
-    } catch (e) {}
+}
+function applyReact(m, who, emoji) {
+    m.reactions = m.reactions || {};
+    const k = who === 'me' ? 'me' : 'peer';
+    if (emoji) m.reactions[k] = emoji; else delete m.reactions[k];
+    saveMsg(m); redraw();
+    reactLine(m, who, emoji);
+}
+function reactLine(m, who, emoji) {
+    if (m.chat !== 'p2p' || m.system) return;
+    const id = 'rx_' + m.id + '_' + who;
+    const ex = getMsg(id);
+    if (!emoji) { if (ex) deleteForMe([id]); return; }
+    const mineR = who === 'me', mineMsg = m.from === 'me';
+    const text = mineR
+        ? 'You reacted ' + emoji + ' to ' + (mineMsg ? 'your own message' : peerName() + "'s message")
+        : peerName() + ' reacted ' + emoji + ' to ' + (mineMsg ? 'your message' : 'their own message');
+    const snip = replyPreview(m).slice(0, 60);
+    if (ex) { ex.text = text; ex.em = emoji; ex.snip = snip; ex.ts = Date.now(); saveMsg(ex); msgs.sort((a, b) => a.ts - b.ts); redraw(true); renderList(); return; }
+    const open = curChat === 'p2p' && !document.hidden;
+    addMsg({ id, chat: 'p2p', from: mineR ? 'me' : 'peer', ts: Date.now(), system: true, sk: 'react', text, em: emoji, snip, local: true, status: 'sent', read: mineR || open, reactions: {} });
+    redraw(true); renderList();
 }
 function sendReact(m, emoji) {
-    m.reactions = m.reactions || {};
-    if (emoji) m.reactions.me = emoji; else delete m.reactions.me;
-    saveMsg(m); redraw();
-    if (m.chat === 'p2p') queueEvt({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
+    applyReact(m, 'me', emoji);
+    if (m.chat === 'p2p') act({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
 }
 function commitEdit(text) {
     const m = getMsg(editingId);
@@ -796,12 +1040,12 @@ function commitEdit(text) {
     if (m.chat === 'saved') { m.text = text; m.edited = true; saveMsg(m); redraw(); renderList(); return; }
     m.text = text; m.edited = true;
     saveMsg(m); redraw(); renderList();
-    queueEvt({ t: 'edit', id: uid(), mid: m.id, text });
+    act({ t: 'edit', id: uid(), mid: m.id, text });
 }
 function unsend(m) {
     if (m.chat === 'tg') { tgDelete(m); return; }
     wipe(m);
-    queueEvt({ t: 'unsend', id: uid(), mid: m.id });
+    act({ t: 'unsend', id: uid(), mid: m.id });
 }
 function deleteForMe(ids) {
     ids.forEach(id => {
@@ -857,8 +1101,7 @@ async function savedAdd(o) {
 }
 function sendTyping(on) {
     if (curChat !== 'p2p') return;
-    if (dcOpen()) { try { dc.send(JSON.stringify({ t: 'typing', on })); } catch (e) {} }
-    else if (peerOnline && chanReady) bsend('evt', { t: 'typing', on });
+    route({ t: 'typing', id: uid(), on }, { ephemeral: true });
 }
 function typingPing() {
     const now = Date.now();
@@ -1054,7 +1297,7 @@ function markRead() {
             if (curChat === 'p2p' && !m.system) ids.push(m.id);
         }
     });
-    if (ids.length) queueEvt({ t: 'ack', id: uid(), ids, s: 'seen' });
+    if (ids.length) { queueEvt({ t: 'ack', id: uid(), ids, s: 'seen' }); readSync(ids); }
     renderList();
 }
 
@@ -1593,15 +1836,15 @@ function startCall(kind) {
         return;
     }
     call = newCall(kind, 'out', 'calling');
+    call.id = uid();
     showCall('Calling…');
     call.ready = acquireLocal(); // mic/camera pehle hi ready (preview + permission), tracks accept ke baad hi jaate hain
     call.ready.then(ok => { if (!ok && call) endCall(true, true); });
-    bsend('call', { a: 'invite', kind });
+    bcall({ a: 'invite', kind, cid: call.id, to: Array.from(peerDevs) });
     callTimer = setTimeout(() => {
         if (call && call.state === 'calling') {
-            bsend('call', { a: 'end' });
+            bcall({ a: 'end', to: Array.from(peerDevs) });
             logCall(kind, 'out', 'noans');
-            
             endCall(false, true);
         }
     }, 40000);
@@ -1652,34 +1895,42 @@ function attachTracks() {
 }
 function onCallMsg(p) {
     if (!p || !appOpen) return;
+    if (p.fu === ME) { // meri apni dusri device ne call utha li / kaat di
+        if (p.a === 'answered' && call && call.state === 'ringing' && call.id === p.cid) { clearTimeout(callTimer); hideIncoming(); call = null; }
+        return;
+    }
+    if (p.to && !p.to.includes(DEV)) return;
+    if (p.td && p.td !== DEV) return;
     if (p.a === 'invite') {
-        if (call) { bsend('call', { a: 'busy' }); return; }
+        if (call) { bcall({ a: 'busy', td: p.fd, cid: p.cid }); return; }
         call = newCall(p.kind === 'video' ? 'video' : 'audio', 'in', 'ringing');
+        call.id = p.cid; call.peerDev = p.fd;
         showIncoming();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
         callTimer = setTimeout(() => {
             if (call && call.state === 'ringing') { hideIncoming(); logCall(call.kind, 'in', 'missed'); call = null; }
         }, 42000);
-    } else if (p.a === 'accept') {
-        if (call && call.dir === 'out' && call.state === 'calling') {
+        return;
+    }
+    if (!call || (p.cid && call.id && p.cid !== call.id)) return;
+    if (p.a === 'accept') {
+        if (call.dir === 'out' && call.state === 'calling') {
             clearTimeout(callTimer);
-            call.state = 'connecting';
+            call.state = 'connecting'; call.peerDev = p.fd;
             setCallStatus('Connecting…');
+            rebind(p.fd);
             call.ready.then(ok => { if (!ok) { endCall(true, true); return; } if (call) attachTracks(); });
         }
     } else if (p.a === 'reject') {
-        if (call && call.dir === 'out') { logCall(call.kind, 'out', 'declined'); endCall(false, true); }
+        if (call.dir === 'out') { logCall(call.kind, 'out', 'declined'); endCall(false, true); }
     } else if (p.a === 'busy') {
-        if (call && call.dir === 'out') { logCall(call.kind, 'out', 'busy'); endCall(false, true); }
+        if (call.dir === 'out') { logCall(call.kind, 'out', 'busy'); endCall(false, true); }
     } else if (p.a === 'screen') {
-        if (call) {
-            call.remoteShare = !!p.on;
-            refreshCallUI();
-            banner(p.on ? peerName() + ' is sharing screen' : '');
-            if (p.on) setTimeout(() => banner(''), 3500);
-        }
+        call.remoteShare = !!p.on;
+        refreshCallUI();
+        banner(p.on ? peerName() + ' is sharing screen' : '');
+        if (p.on) setTimeout(() => banner(''), 3500);
     } else if (p.a === 'end') {
-        if (!call) return;
         if (call.state === 'ringing') { clearTimeout(callTimer); hideIncoming(); logCall(call.kind, 'in', 'missed'); call = null; }
         else endCall(false);
     }
@@ -1690,17 +1941,20 @@ async function acceptCall() {
     hideIncoming();
     call.state = 'connecting';
     showCall('Connecting…');
+    rebind(call.peerDev); // jis device se call aayi usi se P2P jodo
     ensurePC();
     call.ready = acquireLocal();
     const ok = await call.ready;
-    if (!ok) { bsend('call', { a: 'end' }); endCall(false, true); return; }
-    if (!attachTracks()) { bsend('call', { a: 'end' }); endCall(false, true); return; }
-    bsend('call', { a: 'accept' });
+    if (!ok) { bcall({ a: 'end' }); endCall(false, true); return; }
+    if (!attachTracks()) { bcall({ a: 'end' }); endCall(false, true); return; }
+    bcall({ a: 'accept' });
+    if (selfDevs.size) bcall({ a: 'answered', to: Array.from(selfDevs) });
 }
 function rejectCall() {
     if (!call || call.state !== 'ringing') return;
     clearTimeout(callTimer);
-    bsend('call', { a: 'reject' });
+    bcall({ a: 'reject' });
+    if (selfDevs.size) bcall({ a: 'answered', to: Array.from(selfDevs) });
     hideIncoming();
     logCall(call.kind, 'in', 'declined');
     call = null;
@@ -1799,7 +2053,7 @@ function endCall(sendEnd, silent) {
     const c = call;
     call = null;
     clearTimeout(callTimer); clearInterval(callTick); clearTimeout(c.watch); clearInterval(c.qt);
-    if (sendEnd) bsend('call', { a: 'end' });
+    if (sendEnd) bcall({ a: 'end' });
     if (c.share) { try { c.share.track.onended = null; c.share.track.stop(); } catch (e) {} }
     if (c.stream) c.stream.getTracks().forEach(t => t.stop());
     try { if (pc) pc.getSenders().forEach(s => { if (s.track) { try { pc.removeTrack(s); } catch (e) {} } }); } catch (e) {}
@@ -1810,6 +2064,7 @@ function endCall(sendEnd, silent) {
         if (c.t0) logCall(c.kind, c.dir, 'ok', Date.now() - c.t0);
         else logCall(c.kind, c.dir, c.state === 'calling' ? 'cancelled' : 'failed');
     }
+    linkOverride = null; setTimeout(evalLink, 0);
 }
 function toggleMute() {
     if (!call) return;
@@ -1860,7 +2115,7 @@ async function toggleShare() {
     if (call.vSender) { try { await call.vSender.replaceTrack(track); } catch (e) {} }
     else { call.vSender = pc.addTrack(track, ds); preferCodecs(call.vSender); call.shareAdded = true; }
     track.onended = () => stopShare();
-    bsend('call', { a: 'screen', on: true });
+    bcall({ a: 'screen', on: true });
     refreshCallUI();
     banner('Screen share chal rahi hai');
     setTimeout(() => banner(''), 3000);
@@ -1874,7 +2129,7 @@ async function stopShare() {
     try { sh.track.onended = null; sh.track.stop(); } catch (e) {}
     if (call.shareAdded) { try { pc.removeTrack(call.vSender); } catch (e) {} call.vSender = null; call.shareAdded = false; }
     else if (call.vSender && call.camTrack) { try { await call.vSender.replaceTrack(call.camTrack); } catch (e) {} }
-    bsend('call', { a: 'screen', on: false });
+    bcall({ a: 'screen', on: false });
     refreshCallUI();
     banner('');
     tuneSenders();
