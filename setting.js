@@ -212,16 +212,21 @@ let appOpen = false, tgOffset = 0, tgBusy = false, tgTimer = null, hbTimer = nul
 let selMode = false, sel = new Set(), editingId = null, renderLimit = 150, stick = true;
 let remoteStream = null;
 let rec = null, call = null, callTimer = null, callTick = null, typingTimer = null, typingSentAt = 0, typingOffTimer = null;
+let ctxIds = [];
 let rafId = 0, rafForce = false, ctxId = null, replyTo = null;
 const busy = new Set(), urlCache = {}, memBlobs = {}, incoming = { cur: null };
 const RANK = { pending: 0, sent: 1, delivered: 2, seen: 3 };
-let nicks = { p2p: '', tg: '' }, photos = { p2p: null, tg: null }, profChat = 'p2p';
-const nameOf = w => w === 'p2p' ? (NAMES[PEER] || '') : w === 'tg' ? 'Telegram' : 'Saved';
-const chatName = w => nicks[w] || nameOf(w);
+let nicks = { p2p: '', tg: '' }, photos = { p2p: null, tg: null, me: null }, profChat = 'p2p', selfNick = '';
+const isLocal = c => c === 'saved' || c === 'me';
+const nameOf = w => w === 'p2p' ? (NAMES[PEER] || '') : w === 'me' ? (NAMES[ME] || '') : w === 'tg' ? 'Telegram' : 'Saved';
+const chatName = w => w === 'me' ? ((selfNick || NAMES[ME] || '') + ' (You)') : (nicks[w] || nameOf(w));
 const peerName = () => chatName('p2p');
-const pkey = w => w === 'p2p' ? PEER : 'tg';
+const pkey = w => w === 'p2p' ? PEER : w === 'me' ? ME : 'tg';
+const nickOf = w => w === 'me' ? selfNick : (nicks[w] || '');
+const canEditProf = w => w === 'me' || w === 'tg';
 function avInfo(which) {
     if (which === 'p2p') return { cls: PEER === 'radhe' ? 'r' : 'a', letter: NAMES[PEER][0], photo: photos.p2p };
+    if (which === 'me') return { cls: ME === 'radhe' ? 'r' : 'a', letter: (NAMES[ME] || '?')[0], photo: photos.me };
     if (which === 'tg') return { cls: 't', letter: 'T', photo: photos.tg };
     return { cls: 's', letter: '', photo: null };
 }
@@ -238,8 +243,9 @@ function avHTML(which) {
     return '<span class="rd-av ' + a.cls + '" data-avof="' + which + '">' + (which === 'saved' ? ic('bookmark', 24) : a.letter) + '</span>';
 }
 async function loadProfile() {
-    for (const w of ['p2p', 'tg']) {
-        nicks[w] = (await dbGet('kv', 'nick_' + pkey(w))) || '';
+    for (const w of ['p2p', 'tg', 'me']) {
+        const n = (await dbGet('kv', 'nick_' + pkey(w))) || '';
+        if (w === 'me') selfNick = n; else nicks[w] = n;
         const b = await dbGet('blobs', 'photo_' + pkey(w));
         if (photos[w]) { URL.revokeObjectURL(photos[w]); photos[w] = null; }
         if (b) photos[w] = URL.createObjectURL(b);
@@ -248,11 +254,15 @@ async function loadProfile() {
     renderList();
 }
 function applyNames() {
-    if (curChat === 'p2p' || curChat === 'tg') { $('rdName').textContent = chatName(curChat); paintAv($('rdAv'), curChat); }
+    if (curChat) { $('rdName').textContent = chatName(curChat); paintAv($('rdAv'), curChat); }
     paintAv($('rdProfAv'), profChat, 'big');
     $('rdProfName').textContent = nameOf(profChat);
+    const ce = canEditProf(profChat), nk = nickOf(profChat);
     const nt = $('rdNickTxt');
-    if (nt) { nt.textContent = nicks[profChat] || 'Add nickname'; nt.style.opacity = nicks[profChat] ? '1' : '.5'; }
+    if (nt) { nt.textContent = nk || (ce ? 'Add nickname' : 'No nickname'); nt.style.opacity = nk ? '1' : '.5'; }
+    const ne = $('rdNickEdit'); if (ne) ne.hidden = !ce;
+    const pb = $('rdProfPhotoBtn'); if (pb) pb.hidden = !ce;
+    const card = document.querySelector('.rd-prof-card'); if (card) card.hidden = profChat === 'saved';
     $('rdCallName').textContent = peerName(); $('rdInName').textContent = peerName();
     paintAv($('rdCallAv'), 'p2p'); paintAv($('rdInAv'), 'p2p');
 }
@@ -290,7 +300,8 @@ function closeLayer(n) {
     if (n === 'contact') $('contactPage').hidden = true;
     else if (n === 'app') leaveApp();
     else if (n === 'chat') leaveChat();
-    else if (n === 'viewer') { $('rdViewer').hidden = true; $('rdViewerImg').src = ''; $('rdViewerLetter').hidden = true; }
+    else if (n === 'viewer') { $('rdViewer').hidden = true; $('rdViewerImg').src = ''; $('rdViewerLetter').hidden = true; const vv = $('rdViewerVid'); if (vv) { try { vv.pause(); } catch (e) {} vv.removeAttribute('src'); } }
+    else if (n === 'player') { const f = $('rdPlayFrame'); if (f) f.src = 'about:blank'; const pl = $('rdPlayer'); if (pl) pl.hidden = true; }
     else if (n === 'profile') { showScreen('rdChat'); cancelNick(); }
     else if (n === 'crop') { $('rdCrop').hidden = true; if (crop.img && crop.img.close) { try { crop.img.close(); } catch (e) {} } crop.img = null; crop.cb = null; }
 }
@@ -347,80 +358,131 @@ function leaveApp() {
     $('rdApp').hidden = true;
 }
 
-/* ------------------------------ SUPABASE: presence, signaling, offline queue ------------------------------ */
+/* ------------------------------ SUPABASE: devices, presence, signaling, offline queue ------------------------------ */
+const T_DEV = 'rd_devices';        // har device ka chhota record (last seen + multi-device delivery)
+const CLEAN_EVERY = 5 * 3600e3;    // har 5 ghante me server saaf (isse badal sakte ho: 10 * 3600e3)
+const KEEP_MS = 12 * 3600e3;       // server par koi bhi data isse zyada der nahi rukega
+const DEV_TTL = 7 * 864e5;         // 7 din se purani device ko message nahi bhejte
+let DEV = localStorage.getItem('rd_dev');
+if (!DEV) { DEV = Math.random().toString(36).slice(2, 10); try { localStorage.setItem('rd_dev', DEV); } catch (e) {} }
+let devReg = { radhe: {}, amrit: {} };
+let peerDevs = new Set(), selfDevs = new Set(), linkDev = null, linkOverride = null;
+let forceRelay = false, lastResetAt = 0, lastRx = 0, pingT = null, statTimer = null;
+const seenEvt = new Map();
+
 function initNet() {
     if (!sb && window.supabase && window.supabase.createClient) {
         try {
             sb = window.supabase.createClient(SB_URL, SB_KEY, {
                 auth: { persistSession: false, autoRefreshToken: false },
-                realtime: { params: { eventsPerSecond: 20 } }
+                realtime: { params: { eventsPerSecond: 25 } }
             });
         } catch (e) { sb = null; }
     }
     if (!sb) { updateSub(); return; }
     startRealtime();
     touchLastSeen();
-    loadLastSeen();
+    loadDevices();
     fetchPending();
     flushAll();
+    maybeClean();
     clearInterval(hbTimer);
-    hbTimer = setInterval(() => { if (!document.hidden) touchLastSeen(); }, 90000);
+    hbTimer = setInterval(() => { if (!document.hidden) touchLastSeen(); }, 45000);
     clearInterval(fetchTimer);
-    fetchTimer = setInterval(() => { if (!document.hidden && !dcOpen()) fetchPending(); }, 25000);
+    fetchTimer = setInterval(() => { if (!document.hidden) { fetchPending(); maybeClean(); } }, 12000);
+    clearInterval(statTimer);
+    statTimer = setInterval(() => { if (!document.hidden) syncStatus(); }, 6000);
 }
 function stopNet() {
-    clearInterval(hbTimer); clearInterval(fetchTimer);
+    clearInterval(hbTimer); clearInterval(fetchTimer); clearInterval(statTimer);
     touchLastSeen();
     closePC();
     if (channel && sb) { try { sb.removeChannel(channel); } catch (e) {} }
     channel = null; chanReady = false; peerOnline = false;
+    peerDevs = new Set(); selfDevs = new Set(); linkDev = null; linkOverride = null;
 }
 function startRealtime() {
     if (channel || !sb) return;
-    channel = sb.channel('rd-room', { config: { presence: { key: ME }, broadcast: { self: false } } });
+    channel = sb.channel('rd-room', { config: { presence: { key: ME + '|' + DEV }, broadcast: { self: false } } });
     channel
         .on('presence', { event: 'sync' }, onPresence)
         .on('broadcast', { event: 'signal' }, m => onSignal(m.payload))
         .on('broadcast', { event: 'call' }, m => onCallMsg(m.payload))
-        .on('broadcast', { event: 'poke' }, () => fetchPending())
-        .on('broadcast', { event: 'evt' }, m => { if (m.payload) handleEvt(m.payload).catch(() => {}); })
+        .on('broadcast', { event: 'poke' }, m => { const p = m.payload; if (p && p.to && !p.to.includes(DEV)) return; fetchPending(); })
+        .on('broadcast', { event: 'evt' }, m => {
+            const p = m.payload;
+            if (!p) return;
+            if (p.to && !p.to.includes(DEV)) return;
+            handleEvt(p).catch(() => {});
+        })
         .subscribe(st => {
-            if (st === 'SUBSCRIBED') { chanReady = true; channel.track({ at: Date.now() }); }
+            if (st === 'SUBSCRIBED') { chanReady = true; channel.track({ at: Date.now(), u: ME, d: DEV }); fetchPending(); }
             else if (st === 'CLOSED' || st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') chanReady = false;
         });
 }
 function bsend(ev, payload) {
     if (channel && chanReady) { try { channel.send({ type: 'broadcast', event: ev, payload }); } catch (e) {} }
 }
+function bcall(p) { bsend('call', Object.assign({ fu: ME, fd: DEV, cid: call && call.id, td: call && call.peerDev }, p)); }
+function noteDev(u, d) { if (devReg[u] && d) devReg[u][d] = Date.now(); }
+function minDev(set, extra) { const a = Array.from(set); if (extra) a.push(extra); return a.sort()[0]; }
+function evalLink() {
+    // har taraf ka sabse chhota device id P2P banata hai; baaki devices server se message pate hain
+    const myPrimary = minDev(selfDevs, DEV);
+    const peerPrimary = peerDevs.size ? minDev(peerDevs) : null;
+    let want = (peerPrimary && myPrimary === DEV) ? peerPrimary : null;
+    if (linkOverride && peerDevs.has(linkOverride)) want = linkOverride;
+    if (want !== linkDev) { if (pc) closePC(); linkDev = want; }
+    if (linkDev && !pc) ensurePC();
+}
 function onPresence() {
     if (!channel) return;
-    const now = !!channel.presenceState()[PEER];
-    if (now === peerOnline) return;
-    peerOnline = now;
-    if (now) { ensurePC(); fetchPending(); flushAll(); }
-    else {
+    const st = channel.presenceState();
+    const pd = new Set(), sd = new Set();
+    Object.keys(st).forEach(k => {
+        const i = k.indexOf('|');
+        if (i < 0) return;
+        const u = k.slice(0, i), d = k.slice(i + 1);
+        if (u === PEER) pd.add(d); else if (u === ME && d !== DEV) sd.add(d);
+    });
+    const was = peerOnline;
+    const newPeerDev = Array.from(pd).some(d => !peerDevs.has(d));
+    const newSelfDev = Array.from(sd).some(d => !selfDevs.has(d));
+    peerDevs = pd; selfDevs = sd; peerOnline = pd.size > 0;
+    pd.forEach(d => noteDev(PEER, d)); sd.forEach(d => noteDev(ME, d));
+    evalLink();
+    if (peerOnline && !was) { fetchPending(); flushAll(); syncStatus(); }
+    if (!peerOnline && was) {
         closePC();
         if (call) endCall(false);
         peerLastSeen = Date.now();
-        setTimeout(loadLastSeen, 1500);
+        forceRelay = false;
+        setTimeout(loadDevices, 1500);
     }
+    if (newPeerDev || newSelfDev) { sendProfileHello(); }
     updateSub(); renderList();
 }
 function touchLastSeen() {
     if (!sb || !ME || !navigator.onLine) return;
-    try { sb.from(T_PRES).upsert({ user_id: ME, last_seen: new Date().toISOString() }).then(() => {}, () => {}); } catch (e) {}
+    try { sb.from(T_DEV).upsert({ id: ME + '|' + DEV, user_id: ME, dev_id: DEV, last_seen: new Date().toISOString() }).then(() => {}, () => {}); } catch (e) {}
 }
-async function loadLastSeen() {
+async function loadDevices() {
     if (!sb || !PEER) return;
     try {
-        const { data } = await sb.from(T_PRES).select('last_seen').eq('user_id', PEER).maybeSingle();
-        if (data && data.last_seen) {
-            const t = new Date(data.last_seen).getTime();
-            if (!peerLastSeen || t > peerLastSeen - 5000 || !peerOnline) peerLastSeen = t;
-            updateSub();
-        }
+        const since = new Date(Date.now() - DEV_TTL).toISOString();
+        const { data } = await sb.from(T_DEV).select('user_id,dev_id,last_seen').gte('last_seen', since);
+        if (!data) return;
+        let ls = 0;
+        data.forEach(r => {
+            const t = new Date(r.last_seen).getTime();
+            if (devReg[r.user_id]) devReg[r.user_id][r.dev_id] = Math.max(devReg[r.user_id][r.dev_id] || 0, t);
+            if (r.user_id === PEER) ls = Math.max(ls, t);
+        });
+        if (ls && !peerOnline) peerLastSeen = ls;
+        updateSub();
     } catch (e) {}
 }
+const loadLastSeen = loadDevices;
 function lastSeenText() {
     if (!peerLastSeen) return 'offline';
     const t = fmtTime(peerLastSeen), k = dayKey(peerLastSeen), now = Date.now();
@@ -429,61 +491,189 @@ function lastSeenText() {
     return 'last seen ' + new Date(peerLastSeen).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' at ' + t;
 }
 
-/* ---- offline delivery: ek event DB me jaata hai, receiver ke lene ke baad delete ho jaata hai ---- */
-async function insertEvt(evt) {
-    if (!sb || !navigator.onLine || !ME) return false;
+/* ---- routing: ek event ko samne wale ke SAARE devices (aur apne dusre devices) tak pahunchana ----
+   P2P chal raha ho to us device ko seedha; baaki online devices ko realtime channel se turant;
+   offline devices ke liye server (DB) me alag-alag row (jo device ke utha lene par delete ho jaati hai). */
+function devsOf(which) {
+    const u = which === 'self' ? ME : PEER;
+    const set = new Set();
+    const now = Date.now();
+    Object.keys(devReg[u] || {}).forEach(d => { if (now - devReg[u][d] < DEV_TTL) set.add(d); });
+    (which === 'self' ? selfDevs : peerDevs).forEach(d => set.add(d));
+    set.delete(DEV);
+    return set;
+}
+async function insertRows(e, u, devs) {
+    if (!sb || !navigator.onLine || !devs.length) return false;
+    const rows = devs.map(d => ({ id: e.id + '~' + d, from_user: ME, to_user: u, to_dev: d, payload: e }));
     try {
-        const { error } = await sb.from(T_MSG).insert({ id: evt.id, from_user: ME, to_user: PEER, payload: evt });
-        if (error) return error.code === '23505';
-        if (peerOnline) bsend('poke', {});
+        let { error } = await sb.from(T_MSG).insert(rows);
+        if (error) {
+            if (error.code !== '23505') return false;
+            let any = false;
+            for (const r of rows) { const x = await sb.from(T_MSG).insert(r); if (!x.error || x.error.code === '23505') any = true; }
+            error = any ? null : error;
+            if (error) return false;
+        }
+        const online = (u === PEER) ? peerDevs : selfDevs;
+        const live = devs.filter(d => online.has(d));
+        if (live.length) bsend('poke', { to: live });
         return true;
-    } catch (e) { return false; }
+    } catch (x) { return false; }
 }
-async function sendEvt(evt) {
-    if (dcOpen()) { try { dc.send(JSON.stringify(evt)); return true; } catch (e) {} }
-    // fast path: samne wala online hai par P2P nahi bana -> realtime channel se turant (DB nahi)
-    if (peerOnline && chanReady && !evt.media) { bsend('evt', evt); return true; }
-    return await insertEvt(evt);
+async function route(evt, o) {
+    o = o || {};
+    const which = o.to === 'self' ? 'self' : 'peer';
+    const u = which === 'self' ? ME : PEER;
+    const online = which === 'self' ? selfDevs : peerDevs;
+    const devs = devsOf(which);
+    const e = Object.assign({}, evt, { fu: ME, fd: DEV });
+    if (which === 'self') e.mirror = true;
+    let ok = false;
+    const bc = [], dbd = [];
+    devs.forEach(d => {
+        if (o.skip && d === o.skip) return;
+        if (which === 'peer' && d === linkDev && dcOpen() && !o.viaDB) {
+            try { dc.send(JSON.stringify(e)); ok = true; return; } catch (x) {}
+        }
+        const live = online.has(d) && chanReady;
+        if (live && !evt.media && !o.viaDB) bc.push(d);
+        if (!o.ephemeral && (!live || evt.media || o.viaDB || o.both)) dbd.push(d);
+    });
+    if (bc.length) { bsend('evt', Object.assign({}, e, { to: bc })); ok = true; }
+    if (dbd.length) { if (await insertRows(e, u, dbd)) ok = true; }
+    if (!devs.size && !o.ephemeral && which === 'peer') { if (await insertRows(e, u, ['*'])) ok = true; }
+    return ok;
 }
-async function queueEvt(evt) {
-    if (!(await sendEvt(evt))) { outbox.push(evt); dbPut('kv', outbox, 'outbox'); }
+async function queueEvt(evt, o) {
+    if (!(await route(evt, o))) {
+        if (o && o.ephemeral) return;
+        outbox.push({ evt, o: o || {} }); dbPut('kv', outbox, 'outbox');
+    }
 }
+function act(evt) { queueEvt(evt); if (devsOf('self').size) queueEvt(Object.assign({}, evt, { id: evt.id + 'm' }), { to: 'self' }); }
 async function flushOutbox() {
     if (!outbox.length) return;
     const list = outbox.splice(0);
-    for (const ev of list) { if (!(await sendEvt(ev))) outbox.push(ev); }
+    for (const it of list) { const ev = it.evt || it; const o = it.o || {}; if (!(await route(ev, o))) outbox.push({ evt: ev, o }); }
     dbPut('kv', outbox, 'outbox');
 }
 async function fetchPending() {
     if (!sb || !ME || !navigator.onLine || fetching || !appOpen) return;
     fetching = true;
     try {
-        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).order('created_at', { ascending: true });
-        if (error || !data || !data.length) { fetching = false; return; }
-        const done = [];
-        for (const row of data) {
-            try { await handleEvt(row.payload); done.push(row); } catch (e) {}
-        }
-        if (done.length) {
-            await sb.from(T_MSG).delete().in('id', done.map(r => r.id));
-            const paths = done.map(r => r.payload && r.payload.media && r.payload.media.path).filter(Boolean);
-            if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).in('to_dev', [DEV, '*']).order('created_at', { ascending: true }).limit(200);
+        if (!error && data && data.length) {
+            const done = [];
+            for (const row of data) {
+                try { await handleEvt(row.payload); done.push(row); } catch (e) { /* agli baar dobara */ }
+            }
+            if (done.length) {
+                await sb.from(T_MSG).delete().in('id', done.map(r => r.id));
+                cleanMedia(done);
+            }
+            if (data.length >= 200) setTimeout(fetchPending, 300);
         }
     } catch (e) {}
     fetching = false;
 }
+async function cleanMedia(rows) {
+    for (const r of rows) {
+        const p = r.payload && r.payload.media && r.payload.media.path;
+        if (!p) continue;
+        try {
+            const base = String(r.id).split('~')[0];
+            const { count } = await sb.from(T_MSG).select('id', { count: 'exact', head: true }).like('id', base + '~%');
+            if (!count) await sb.storage.from(BUCKET).remove([p]); // sab devices le chuke -> file server se hata do
+        } catch (e) {}
+    }
+}
+/* ---- server saaf: data pehle phone ke local storage me aa chuka hota hai, phir server se delete ---- */
+async function maybeClean(force) {
+    if (!sb || !ME || !navigator.onLine) return 0;
+    const last = Number(localStorage.getItem('rd_clean_ts') || 0);
+    if (!force && Date.now() - last < CLEAN_EVERY) return 0;
+    localStorage.setItem('rd_clean_ts', String(Date.now()));
+    return cleanupSupabase(KEEP_MS);
+}
+async function cleanupSupabase(keep) {
+    if (!sb) return 0;
+    let n = 0;
+    keep = keep == null ? KEEP_MS : keep;
+    try {
+        await fetchPending(); // apne device ka sab data pehle local storage me
+        const cut = new Date(Date.now() - keep).toISOString();
+        const old = await sb.from(T_MSG).select('id,payload').lt('created_at', cut).limit(1000);
+        if (old.data && old.data.length) {
+            const paths = old.data.map(r => r.payload && r.payload.media && r.payload.media.path).filter(Boolean);
+            await sb.from(T_MSG).delete().in('id', old.data.map(r => r.id));
+            n += old.data.length;
+            if (paths.length) await sb.storage.from(BUCKET).remove(Array.from(new Set(paths)));
+        }
+        for (const u of ['radhe', 'amrit']) {
+            const { data: files } = await sb.storage.from(BUCKET).list(u, { limit: 1000 });
+            const dead = (files || []).filter(f => f.created_at && new Date(f.created_at).getTime() < Date.now() - keep).map(f => u + '/' + f.name);
+            if (dead.length) { await sb.storage.from(BUCKET).remove(dead); n += dead.length; }
+        }
+        await sb.from(T_DEV).delete().lt('last_seen', new Date(Date.now() - 14 * 864e5).toISOString());
+    } catch (e) {}
+    return n;
+}
 function flushAll() {
     flushOutbox();
-    msgs.forEach(m => { if (m.chat === 'p2p' && m.from === 'me' && m.status === 'pending' && !m.local) deliver(m); });
+    msgs.forEach(m => { if (m.chat === 'p2p' && m.from === 'me' && (m.status === 'pending' || m.q) && !m.local) deliver(m); });
     tgFlush();
+}
+/* ---- tick sync: bheje hue messages ka asli status samne wale se poochho (blue tick kabhi na chhute) ---- */
+function syncStatus() {
+    if (!appOpen || !(peerOnline || dcOpen())) return;
+    const ids = [];
+    for (let i = msgs.length - 1; i >= 0 && ids.length < 150; i--) {
+        const m = msgs[i];
+        if (m.chat === 'p2p' && m.from === 'me' && !m.system && !m.deleted && m.status !== 'seen' && m.status !== 'pending') ids.push(m.id);
+    }
+    if (ids.length) route({ t: 'sts', id: uid(), ids }, { ephemeral: true });
+}
+function answerStatus(ids) {
+    const seen = [], del = [];
+    (ids || []).forEach(id => { const m = getMsg(id); if (m && m.from === 'peer' && !m.system) (m.read ? seen : del).push(id); });
+    if (seen.length) queueEvt({ t: 'ack', id: uid(), ids: seen, s: 'seen' });
+    if (del.length) queueEvt({ t: 'ack', id: uid(), ids: del, s: 'delivered' });
 }
 
 /* ------------------------------ WEBRTC (peer to peer) ------------------------------ */
 function dcOpen() { return !!dc && dc.readyState === 'open'; }
+function sig(p) { bsend('signal', Object.assign({ fd: DEV, td: linkDev }, p)); }
+function iceConfig() { return forceRelay ? Object.assign({}, ICE, { iceTransportPolicy: 'relay' }) : ICE; }
+function rebind(dev) { linkOverride = dev || null; evalLink(); }
+function requestReset(relay) {
+    const now = Date.now();
+    if (now - lastResetAt < 4000) return;
+    lastResetAt = now;
+    if (ME === 'amrit') doReset(relay); else sig({ want: 'reset', relay: !!relay });
+}
+function doReset(relay) {
+    forceRelay = !!relay;
+    sig({ reset: true, relay: forceRelay });
+    closePC();
+    setTimeout(() => { if (linkDev && !pc) ensurePC(); }, 250);
+}
+function startKeepalive() {
+    stopKeepalive();
+    lastRx = Date.now();
+    pingT = setInterval(() => {
+        if (!dcOpen()) return;
+        try { dc.send('{"t":"ping"}'); } catch (e) {}
+        const idle = Date.now() - lastRx;
+        if (idle > 45000) requestReset(forceRelay);
+        else if (idle > 22000) { try { pc.restartIce(); } catch (e) {} }
+    }, 8000);
+}
+function stopKeepalive() { clearInterval(pingT); pingT = null; }
 function ensurePC() {
-    if (pc || !appOpen) return;
+    if (pc || !appOpen || !linkDev) return;
     let mypc;
-    try { mypc = new RTCPeerConnection(ICE); } catch (e) { pc = null; return; }
+    try { mypc = new RTCPeerConnection(iceConfig()); } catch (e) { pc = null; return; }
     pc = mypc;
     dc = mypc.createDataChannel('chat', { negotiated: true, id: 0, ordered: true });
     setupDC(dc);
@@ -491,7 +681,7 @@ function ensurePC() {
         if (!e.candidate) return;
         candBuf.push(e.candidate.toJSON());
         clearTimeout(candTimer);
-        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) bsend('signal', { cands: c }); }, 60);
+        candTimer = setTimeout(() => { const c = candBuf.splice(0); if (c.length) sig({ cands: c }); }, 60);
     };
     mypc.onnegotiationneeded = async () => {
         try {
@@ -501,7 +691,7 @@ function ensurePC() {
             if (mypc.signalingState !== 'stable') return;
             await mypc.setLocalDescription(offer);
             if (mypc !== pc) return;
-            bsend('signal', { desc: { type: mypc.localDescription.type, sdp: mypc.localDescription.sdp } });
+            sig({ desc: { type: mypc.localDescription.type, sdp: mypc.localDescription.sdp } });
         } catch (e) {} finally { makingOffer = false; }
     };
     mypc.ontrack = e => {
@@ -523,24 +713,31 @@ function ensurePC() {
     mypc.onconnectionstatechange = () => {
         if (mypc !== pc) return;
         const s = mypc.connectionState;
-        if (s === 'connected') maybeLive();
-        if (s === 'failed' && (mypc._fails || 0) > 2 || s === 'closed') {
+        if (s === 'connected') { clearTimeout(mypc._wd); maybeLive(); }
+        if ((s === 'failed' && (mypc._fails || 0) > 2) || s === 'closed') {
             closePC();
-            if (peerOnline) setTimeout(() => { if (peerOnline && !pc) ensurePC(); }, 1200);
+            if (peerOnline && linkDev) setTimeout(() => requestReset(forceRelay), 800);
         }
         updateSub();
     };
+    // 12-16 second me connect na ho to TURN-relay mode me dobara (mobile data / strict NAT ke liye)
+    mypc._wd = setTimeout(() => { if (mypc === pc && mypc.connectionState !== 'connected' && linkDev) requestReset(!forceRelay); }, ME === 'amrit' ? 12000 : 16000);
 }
 function closePC() {
     const p = pc;
     pc = null;
+    stopKeepalive();
+    try { p && clearTimeout(p._wd); } catch (e) {}
     try { dc && dc.close(); } catch (e) {}
     try { p && p.close(); } catch (e) {}
-    dc = null; pendingCand = []; makingOffer = false; incoming.cur = null; remoteStream = null;
+    dc = null; pendingCand = []; candBuf = []; makingOffer = false; incoming.cur = null; remoteStream = null;
     updateSub(); renderList();
 }
 async function onSignal(p) {
     if (!p || !appOpen) return;
+    if (p.td !== DEV || !linkDev || p.fd !== linkDev) return;
+    if (p.want === 'reset') { if (ME === 'amrit') requestReset(p.relay); return; }
+    if (p.reset) { forceRelay = !!p.relay; closePC(); ensurePC(); return; }
     ensurePC();
     if (!pc) return;
     const polite = ME === 'radhe';
@@ -556,7 +753,7 @@ async function onSignal(p) {
                 const ans = await pc.createAnswer();
                 ans.sdp = tuneSDP(ans.sdp);
                 await pc.setLocalDescription(ans);
-                bsend('signal', { desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+                sig({ desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
             }
         } else if (p.cands) {
             for (const c of p.cands) {
@@ -568,13 +765,17 @@ async function onSignal(p) {
 }
 function setupDC(ch) {
     ch.binaryType = 'arraybuffer';
-    ch.onopen = () => { if (dc !== ch) return; updateSub(); renderList(); flushAll(); };
+    ch.onopen = () => {
+        if (dc !== ch) return;
+        try { clearTimeout(pc._wd); } catch (e) {}
+        startKeepalive(); updateSub(); renderList(); flushAll(); syncStatus();
+    };
     ch.onclose = () => {
         if (dc !== ch) return;
-        dropIncomplete();
+        stopKeepalive(); dropIncomplete();
         updateSub(); renderList();
     };
-    ch.onmessage = ev => onDC(ev.data);
+    ch.onmessage = ev => { lastRx = Date.now(); onDC(ev.data); };
 }
 function dropIncomplete() {
     incoming.cur = null;
@@ -604,6 +805,8 @@ function onDC(d) {
     }
     let e;
     try { e = JSON.parse(d); } catch (x) { return; }
+    if (e.t === 'ping') { try { dc.send('{"t":"pong"}'); } catch (x) {} return; }
+    if (e.t === 'pong') return;
     if (e.t === 'media-start') {
         const ex = getMsg(e.id);
         if (ex && !ex.rx) { incoming.cur = { skip: true, evt: e }; return; } // pehle se mil chuka hai
@@ -624,33 +827,46 @@ function onDC(d) {
     } else handleEvt(e).catch(() => {});
 }
 
-/* ------------------------------ EVENTS (msg / ack / edit / unsend / react / typing) ------------------------------ */
+/* ------------------------------ EVENTS (msg / ack / edit / unsend / react / typing / profile) ------------------------------ */
 async function handleEvt(e, blob) {
+    if (!e || !e.t) return;
+    const mine = e.fu === ME;      // meri apni dusri device se aaya (mirror)
+    if (e.id && e.t !== 'msg') {
+        if (seenEvt.has(e.id)) return;
+        seenEvt.set(e.id, 1);
+        if (seenEvt.size > 2000) seenEvt.delete(seenEvt.keys().next().value);
+    }
     switch (e.t) {
-        case 'msg': return onMsg(e, blob);
+        case 'msg': return onMsg(e, blob, mine);
         case 'ack':
             for (const id of (e.ids || [])) { const m = getMsg(id); if (m && m.from === 'me') setStatus(m, e.s); }
             return;
+        case 'sts':
+            if (!mine) answerStatus(e.ids);
+            return;
         case 'edit': {
             const m = getMsg(e.mid);
-            if (m && m.from === 'peer' && !m.deleted) { m.text = e.text; m.edited = true; saveMsg(m); redraw(); renderList(); }
+            if (m && !m.deleted && ((mine && m.from === 'me') || (!mine && m.from === 'peer'))) { m.text = e.text; m.edited = true; saveMsg(m); redraw(); renderList(); }
             return;
         }
         case 'unsend': {
             const m = getMsg(e.mid);
-            if (m && m.from === 'peer') wipe(m);
+            if (m && ((mine && m.from === 'me') || (!mine && m.from === 'peer'))) wipe(m);
             return;
         }
         case 'react': {
             const m = getMsg(e.mid);
-            if (m) {
-                m.reactions = m.reactions || {};
-                if (e.emoji) m.reactions.peer = e.emoji; else delete m.reactions.peer;
-                saveMsg(m); redraw();
-            }
+            if (m) applyReact(m, mine ? 'me' : 'peer', e.emoji || null);
             return;
         }
+        case 'readsync':
+            if (!mine) return;
+            (e.ids || []).forEach(id => { const m = getMsg(id); if (m && !m.read) { m.read = true; saveMsg(m); } });
+            renderList();
+            return;
+        case 'prof': return onProf(e, mine);
         case 'typing':
+            if (mine) return;
             peerTyping = !!e.on;
             clearTimeout(typingTimer);
             if (peerTyping) typingTimer = setTimeout(() => { peerTyping = false; updateSub(); renderList(); }, 3500);
@@ -658,9 +874,16 @@ async function handleEvt(e, blob) {
             return;
     }
 }
-async function onMsg(e, blob) {
-    if (getMsg(e.id)) { if (!e.system) ackMsg(e.id, 'delivered'); return; }
-    const m = { id: e.id, chat: 'p2p', from: 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, sk: e.sk || '', fwd: !!e.fwd, cl: e.cl ? Object.assign({}, e.cl, { dir: e.cl.dir === 'out' ? 'in' : 'out' }) : undefined, reply: e.reply ? { id: e.reply.id, who: e.reply.who === 'me' ? 'peer' : 'me', t: e.reply.t } : undefined, voice: !!e.voice, status: 'received', read: false, reactions: {} };
+async function onMsg(e, blob, mine) {
+    const ex = getMsg(e.id);
+    if (ex) { if (!mine && !e.system && ex.from === 'peer') ackMsg(e.id, ex.read ? 'seen' : 'delivered'); return; }
+    const m = {
+        id: e.id, chat: 'p2p', from: mine ? 'me' : 'peer', ts: e.ts || Date.now(), text: e.text || '', system: !!e.system, sk: e.sk || '',
+        fwd: !!e.fwd, album: e.al || undefined,
+        cl: e.cl ? (mine ? e.cl : Object.assign({}, e.cl, { dir: e.cl.dir === 'out' ? 'in' : 'out' })) : undefined,
+        reply: e.reply ? { id: e.reply.id, who: mine ? e.reply.who : (e.reply.who === 'me' ? 'peer' : 'me'), t: e.reply.t } : undefined,
+        voice: !!e.voice, status: mine ? 'sent' : 'received', read: !!mine, reactions: {}
+    };
     if (m.cl) m.text = clText(m.cl);
     if (e.media) {
         m.media = { name: e.media.name, type: e.media.type, size: e.media.size };
@@ -672,12 +895,69 @@ async function onMsg(e, blob) {
         if (blob) await dbPut('blobs', blob, m.id); else m.media.failed = true;
     }
     addMsg(m);
-    if (!m.system) {
-        if (curChat === 'p2p' && !document.hidden) { m.read = true; saveMsg(m); ackMsg(m.id, 'seen'); }
-        else ackMsg(m.id, 'delivered');
-    } else if (curChat === 'p2p' && !document.hidden) { m.read = true; saveMsg(m); }
+    const open = curChat === 'p2p' && !document.hidden;
+    if (!mine) {
+        if (!m.system) {
+            if (open) { m.read = true; saveMsg(m); ackMsg(m.id, 'seen'); readSync([m.id]); }
+            else ackMsg(m.id, 'delivered');
+        } else if (open) { m.read = true; saveMsg(m); }
+    }
     redraw(); renderList();
 }
+/* ---- profile sync: meri photo + nickname samne wale ke saare devices (aur meri dusri devices) tak ---- */
+function blobToDataURL(b) { return new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => res(null); r.readAsDataURL(b); }); }
+function dataURLtoBlob(u) {
+    try {
+        const i = u.indexOf(','), head = u.slice(5, i), bin = atob(u.slice(i + 1));
+        const a = new Uint8Array(bin.length);
+        for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k);
+        return new Blob([a], { type: head.split(';')[0] || 'image/png' });
+    } catch (e) { return null; }
+}
+async function smallPhoto() {
+    const b = await dbGet('blobs', 'photo_' + ME);
+    if (!b) return null;
+    try {
+        const bmp = await createImageBitmap(b);
+        const c = document.createElement('canvas'); c.width = c.height = 256;
+        c.getContext('2d').drawImage(bmp, 0, 0, 256, 256);
+        const out = await new Promise(r => c.toBlob(r, 'image/webp', 0.85));
+        return await blobToDataURL(out || b);
+    } catch (e) { return null; }
+}
+async function sendProfile(kind, old, id) {
+    if (!ME) return;
+    const e = { t: 'prof', id: id || uid(), kind, nick: selfNick, old: old || '', ts: Date.now() };
+    if (kind === 'photo' || kind === 'hello') { const ph = await smallPhoto(); if (ph) e.photo = ph; }
+    queueEvt(e);
+    if (devsOf('self').size) queueEvt(Object.assign({}, e, { id: e.id + 'm' }), { to: 'self' });
+}
+let helloT = null;
+function sendProfileHello() {
+    if (!appOpen || !ME) return;
+    clearTimeout(helloT);
+    helloT = setTimeout(() => sendProfile('hello'), 900);
+}
+function addNickLine(mine, id, subject, nv) {
+    const mid = 'nk_' + String(id).replace(/m$/, '');
+    if (getMsg(mid)) return;
+    const text = mine
+        ? (nv ? 'You changed nickname to “' + nv + '”' : 'You removed your nickname')
+        : (nv ? subject + ' changed nickname to “' + nv + '”' : subject + ' removed nickname');
+    addMsg({ id: mid, chat: 'p2p', from: mine ? 'me' : 'peer', ts: Date.now(), system: true, sk: 'nick', text, local: true, status: 'sent', read: mine || (curChat === 'p2p' && !document.hidden), reactions: {} });
+    redraw(true); renderList();
+}
+async function onProf(e, mine) {
+    const who = mine ? ME : PEER;
+    const prev = mine ? selfNick : nicks.p2p;
+    const nv = (e.nick || '').trim();
+    await dbPut('kv', nv, 'nick_' + who);
+    if (e.photo) { const b = dataURLtoBlob(e.photo); if (b) await dbPut('blobs', b, 'photo_' + who); }
+    if (e.kind === 'nick' && prev !== nv) addNickLine(mine, e.id, e.old || prev || NAMES[PEER], nv);
+    await loadProfile();
+}
+function nickLineName() { return NAMES[PEER]; }
+function readSync(ids) { if (ids.length && devsOf('self').size) route({ t: 'readsync', id: uid(), ids }, { to: 'self', ephemeral: true }); }
 function ackMsg(id, s) { queueEvt({ t: 'ack', id: uid(), ids: [id], s }); }
 function setStatus(m, s) {
     if ((RANK[s] || 0) <= (RANK[m.status] || 0)) return;
@@ -696,7 +976,7 @@ async function p2pSend(o) {
     const file = o.file;
     if (file && file.size > MAX_P2P_FILE) { toast('File bahut badi hai (1 GB limit)'); return; }
     if (file && file.size > MAX_DB_FILE && !dcOpen()) toast('Badi file — P2P connect hote hi jaayegi');
-    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: 'pending', reactions: {}, voice: !!o.voice, fwd: !!o.fwd, reply: o.reply || undefined };
+    const m = { id: uid(), chat: 'p2p', from: 'me', ts: Date.now(), text: o.text || '', status: navigator.onLine ? 'sent' : 'pending', q: true, reactions: {}, voice: !!o.voice, fwd: !!o.fwd, reply: o.reply || undefined, album: o.album || undefined };
     if (file) {
         m.media = { name: file.name || ('file_' + Date.now()), type: file.type || 'application/octet-stream', size: file.size };
         memBlobs[m.id] = file;
@@ -720,7 +1000,7 @@ function drain() {
 let chain = Promise.resolve();
 function enqueue(fn) { chain = chain.then(fn, fn); return chain; }
 function deliver(m) {
-    if (busy.has(m.id) || m.status !== 'pending') return;
+    if (busy.has(m.id) || !(m.q || m.status === 'pending')) return;
     busy.add(m.id);
     const run = async () => {
         try { await deliverNow(m); } catch (e) {}
@@ -728,15 +1008,29 @@ function deliver(m) {
     };
     if (m.media) enqueue(run); else run(); // text kabhi badi file ke peeche nahi ruke
 }
+async function uploadMedia(m, evt) {
+    if (!sb || !navigator.onLine) return false;
+    const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
+    if (!blob || blob.size > MAX_DB_FILE) return false;
+    const safe = String(m.media.name).replace(/[^\w.\-]+/g, '_');
+    const path = ME + '/' + m.id + '_' + safe;
+    const up = () => sb.storage.from(BUCKET).upload(path, blob, { contentType: m.media.type || 'application/octet-stream', upsert: true });
+    let r = await up();
+    if (r.error) { await cleanupSupabase(); r = await up(); } // storage bhar gaya ho to saaf karke dobara
+    if (r.error) return false;
+    evt.media.path = path;
+    return true;
+}
 async function deliverNow(m) {
     if (m.deleted) return;
-    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, fwd: !!m.fwd, reply: m.reply || null, media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
-    if (dcOpen()) {
+    const evt = { t: 'msg', id: m.id, ts: m.ts, text: m.text, voice: !!m.voice, fwd: !!m.fwd, reply: m.reply || null, al: m.album || '', media: m.media ? { name: m.media.name, type: m.media.type, size: m.media.size } : null };
+    let p2pOK = false;
+    if (dcOpen() && linkDev) {
         try {
             if (m.media) {
                 const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
                 if (!blob) throw new Error('no blob');
-                dc.send(JSON.stringify(Object.assign({}, evt, { t: 'media-start' })));
+                dc.send(JSON.stringify(Object.assign({}, evt, { t: 'media-start', fu: ME, fd: DEV })));
                 const total = blob.size;
                 m.prog = 0; redraw();
                 for (let o = 0; o < total; o += SLICE) {
@@ -752,56 +1046,69 @@ async function deliverNow(m) {
                 }
                 dc.send(JSON.stringify({ t: 'media-end', id: m.id }));
                 delete m.prog;
-            } else dc.send(JSON.stringify(evt));
-            setStatus(m, 'sent');
-            return;
-        } catch (e) { delete m.prog; redraw(); /* DB route / dobara try */ }
+            } else dc.send(JSON.stringify(Object.assign({}, evt, { fu: ME, fd: DEV })));
+            p2pOK = true;
+        } catch (e) { delete m.prog; redraw(); }
     }
-    // fast path: peer online hai par P2P nahi bana -> realtime channel (turant). 3.5s me delivered na aaye to DB se.
-    if (!m.media && peerOnline && chanReady) {
-        bsend('evt', evt);
+    const peerT = devsOf('peer'), selfT = devsOf('self');
+    const otherPeer = Array.from(peerT).some(d => !(p2pOK && d === linkDev));
+    const needRows = otherPeer || (!p2pOK && !peerT.size);
+    let uploaded = !m.media;
+    if (m.media && (needRows || selfT.size)) uploaded = await uploadMedia(m, evt);
+    let routeOK = false;
+    if (needRows && uploaded) routeOK = await route(evt, { skip: p2pOK ? linkDev : null });
+    if (selfT.size && uploaded) route(evt, { to: 'self', both: true }); // meri dusri devices me bhi
+    if (p2pOK || routeOK) {
+        delete m.q; saveMsg(m);
         setStatus(m, 'sent');
-        setTimeout(() => {
+        if (needRows && !routeOK && !m.media) { outbox.push({ evt, o: { skip: p2pOK ? linkDev : null } }); dbPut('kv', outbox, 'outbox'); }
+        if (!m.media) setTimeout(() => {
             const x = getMsg(m.id);
-            if (x && !x.deleted && (RANK[x.status] || 0) < RANK.delivered) insertEvt(evt);
-        }, 3500);
-        return;
+            if (x && !x.deleted && (RANK[x.status] || 0) < RANK.delivered) route(evt, { viaDB: true }); // 4.5s me delivered nahi aaya -> server se bhi
+        }, 4500);
+        setTimeout(syncStatus, 2500);
     }
-    if (!sb || !navigator.onLine) return;
-    try {
-        if (m.media) {
-            const blob = memBlobs[m.id] || await dbGet('blobs', m.id);
-            if (!blob) return;
-            if (blob.size > MAX_DB_FILE) return;
-            const safe = String(m.media.name).replace(/[^\w.\-]+/g, '_');
-            const path = ME + '/' + m.id + '_' + safe;
-            const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: m.media.type || 'application/octet-stream', upsert: true });
-            if (error) return;
-            evt.media.path = path;
-        }
-        if (await insertEvt(evt)) setStatus(m, 'sent');
-    } catch (e) {}
+}
+function applyReact(m, who, emoji) {
+    m.reactions = m.reactions || {};
+    const k = who === 'me' ? 'me' : 'peer';
+    if (emoji) m.reactions[k] = emoji; else delete m.reactions[k];
+    saveMsg(m); redraw();
+    reactLine(m, who, emoji);
+}
+function reactLine(m, who, emoji) {
+    if (m.chat !== 'p2p' || m.system) return;
+    const id = 'rx_' + m.id + '_' + who;
+    const ex = getMsg(id);
+    if (!emoji) { if (ex) deleteForMe([id]); return; }
+    const mineR = who === 'me', mineMsg = m.from === 'me';
+    const text = mineR
+        ? 'You reacted ' + emoji + ' to ' + (mineMsg ? 'your own message' : peerName() + "'s message")
+        : peerName() + ' reacted ' + emoji + ' to ' + (mineMsg ? 'your message' : 'their own message');
+    const snip = replyPreview(m).slice(0, 60);
+    if (ex) { ex.text = text; ex.em = emoji; ex.snip = snip; ex.ts = Date.now(); saveMsg(ex); msgs.sort((a, b) => a.ts - b.ts); redraw(true); renderList(); return; }
+    const open = curChat === 'p2p' && !document.hidden;
+    addMsg({ id, chat: 'p2p', from: mineR ? 'me' : 'peer', ts: Date.now(), system: true, sk: 'react', text, em: emoji, snip, local: true, status: 'sent', read: mineR || open, reactions: {} });
+    redraw(true); renderList();
 }
 function sendReact(m, emoji) {
-    m.reactions = m.reactions || {};
-    if (emoji) m.reactions.me = emoji; else delete m.reactions.me;
-    saveMsg(m); redraw();
-    if (m.chat === 'p2p') queueEvt({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
+    applyReact(m, 'me', emoji);
+    if (m.chat === 'p2p') act({ t: 'react', id: uid(), mid: m.id, emoji: emoji || null });
 }
 function commitEdit(text) {
     const m = getMsg(editingId);
     cancelEdit();
     if (!m || !text.trim()) return;
     if (m.chat === 'tg') { tgEdit(m, text); return; }
-    if (m.chat === 'saved') { m.text = text; m.edited = true; saveMsg(m); redraw(); renderList(); return; }
+    if (isLocal(m.chat)) { m.text = text; m.edited = true; saveMsg(m); redraw(); renderList(); return; }
     m.text = text; m.edited = true;
     saveMsg(m); redraw(); renderList();
-    queueEvt({ t: 'edit', id: uid(), mid: m.id, text });
+    act({ t: 'edit', id: uid(), mid: m.id, text });
 }
 function unsend(m) {
     if (m.chat === 'tg') { tgDelete(m); return; }
     wipe(m);
-    queueEvt({ t: 'unsend', id: uid(), mid: m.id });
+    act({ t: 'unsend', id: uid(), mid: m.id });
 }
 function deleteForMe(ids) {
     ids.forEach(id => {
@@ -840,13 +1147,14 @@ function logCall(kind, dir, result, dur, note) {
     const m = { id: uid(), chat: 'p2p', from: dir === 'out' ? 'me' : 'peer', ts: Date.now(), text: clText(cl), system: true, sk: 'call', cl, local: true, status: 'sent', read: true, reactions: {} };
     addMsg(m); redraw(true); renderList();
 }
-function sendFile(file, voice) {
+function sendFile(file, voice, album) {
     if (curChat === 'tg') tgSendFile(file, voice);
-    else if (curChat === 'saved') savedAdd({ file, voice });
-    else p2pSend({ file, voice });
+    else if (isLocal(curChat)) savedAdd({ file, voice, album }, curChat);
+    else p2pSend({ file, voice, album });
 }
-async function savedAdd(o) {
-    const m = { id: 'sv_' + uid(), chat: 'saved', from: 'me', ts: Date.now(), text: o.text || '', status: 'sent', read: true, reactions: {}, voice: !!o.voice, fwd: !!o.fwd, reply: o.reply || undefined };
+async function savedAdd(o, chat) {
+    chat = chat || 'saved';
+    const m = { id: (chat === 'me' ? 'me_' : 'sv_') + uid(), chat, album: o.album || undefined, from: 'me', ts: Date.now(), text: o.text || '', status: 'sent', read: true, reactions: {}, voice: !!o.voice, fwd: !!o.fwd, reply: o.reply || undefined };
     if (o.file) {
         m.media = { name: o.file.name || ('file_' + Date.now()), type: o.file.type || 'application/octet-stream', size: o.file.size };
         memBlobs[m.id] = o.file;
@@ -857,14 +1165,286 @@ async function savedAdd(o) {
 }
 function sendTyping(on) {
     if (curChat !== 'p2p') return;
-    if (dcOpen()) { try { dc.send(JSON.stringify({ t: 'typing', on })); } catch (e) {} }
-    else if (peerOnline && chanReady) bsend('evt', { t: 'typing', on });
+    route({ t: 'typing', id: uid(), on }, { ephemeral: true });
 }
 function typingPing() {
     const now = Date.now();
     if (now - typingSentAt > 1200) { typingSentAt = now; sendTyping(true); }
     clearTimeout(typingOffTimer);
     typingOffTimer = setTimeout(() => { typingSentAt = 0; sendTyping(false); }, 2200);
+}
+
+/* ---- links: preview + in-app player (YouTube, Instagram, Vimeo, TikTok, Facebook, Spotify ...) ---- */
+const URL_RE = /\b((?:https?:\/\/|www\.)[^\s<>"'`]+[^\s<>"'`.,;:!?)\]}])/gi;
+const metaBusy = new Set();
+const LP_NAMES = { yt: 'YouTube', ig: 'Instagram', vimeo: 'Vimeo', dm: 'Dailymotion', tt: 'TikTok', fb: 'Facebook', sp: 'Spotify', sc: 'SoundCloud', gd: 'Google Drive' };
+function urlsIn(t) {
+    const out = [];
+    String(t || '').replace(URL_RE, m => { out.push(m.startsWith('www.') ? 'https://' + m : m); return m; });
+    return out;
+}
+function linkify(t) {
+    t = String(t == null ? '' : t);
+    let res = '', last = 0;
+    t.replace(URL_RE, (m, p1, off) => {
+        res += esc(t.slice(last, off));
+        const href = m.startsWith('www.') ? 'https://' + m : m;
+        res += '<a class="rd-a" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(m) + '</a>';
+        last = off + m.length;
+        return m;
+    });
+    return res + esc(t.slice(last));
+}
+function classify(u) {
+    const o = { url: u, host: u, kind: 'web' };
+    let x;
+    try { x = new URL(u); } catch (e) { return o; }
+    const h = x.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    const p = x.pathname, q = x.searchParams;
+    o.host = h;
+    let m;
+    if (h === 'youtu.be') { o.id = p.slice(1).split('/')[0]; if (o.id) o.kind = 'yt'; }
+    else if (/(^|\.)youtube(-nocookie)?\.com$/.test(h)) {
+        if (p === '/watch') o.id = q.get('v');
+        else if ((m = p.match(/^\/(shorts|embed|live|v)\/([\w-]{6,})/))) o.id = m[2];
+        if (o.id) o.kind = 'yt';
+    }
+    else if (/(^|\.)instagram\.com$/.test(h) && ((m = p.match(/^\/(?:[\w.]+\/)?(p|reel|reels|tv)\/([\w-]+)/)))) { o.kind = 'ig'; o.igType = m[1] === 'reels' ? 'reel' : m[1]; o.id = m[2]; }
+    else if (/(^|\.)vimeo\.com$/.test(h) && ((m = p.match(/\/(\d{6,})/)))) { o.kind = 'vimeo'; o.id = m[1]; }
+    else if (h === 'dai.ly') { o.kind = 'dm'; o.id = p.slice(1); }
+    else if (/(^|\.)dailymotion\.com$/.test(h) && ((m = p.match(/\/video\/([\w]+)/)))) { o.kind = 'dm'; o.id = m[1]; }
+    else if (/(^|\.)tiktok\.com$/.test(h) && ((m = p.match(/\/video\/(\d+)/)))) { o.kind = 'tt'; o.id = m[1]; }
+    else if (h === 'fb.watch' || (/(^|\.)facebook\.com$/.test(h) && /\/(videos?|reel|watch)\b/.test(p + x.search))) o.kind = 'fb';
+    else if (h === 'open.spotify.com' && ((m = p.match(/\/(track|album|playlist|episode|show)\/(\w+)/)))) { o.kind = 'sp'; o.sp = m[1]; o.id = m[2]; }
+    else if (/(^|\.)soundcloud\.com$/.test(h) && p.split('/').length > 2) o.kind = 'sc';
+    else if (h === 'drive.google.com' && ((m = p.match(/\/file\/d\/([\w-]+)/)))) { o.kind = 'gd'; o.id = m[1]; }
+    else if (/\.(mp4|webm|mov|m4v|ogv)$/i.test(p)) o.kind = 'vid';
+    else if (/\.(mp3|m4a|wav|ogg|aac|flac)$/i.test(p)) o.kind = 'aud';
+    else if (/\.(jpe?g|png|gif|webp|avif|bmp)$/i.test(p)) o.kind = 'img';
+    else if (/\.(pdf|apk|zip|rar|7z|docx?|xlsx?|pptx?)$/i.test(p)) o.kind = 'file';
+    if (o.kind === 'yt') o.img = 'https://i.ytimg.com/vi/' + o.id + '/hqdefault.jpg';
+    return o;
+}
+function embedUrl(lp) {
+    const u = encodeURIComponent(lp.url);
+    switch (lp.kind) {
+        case 'yt': return 'https://www.youtube-nocookie.com/embed/' + lp.id + '?autoplay=1&playsinline=1&rel=0';
+        case 'ig': return 'https://www.instagram.com/' + lp.igType + '/' + lp.id + '/embed/';
+        case 'vimeo': return 'https://player.vimeo.com/video/' + lp.id + '?autoplay=1';
+        case 'dm': return 'https://www.dailymotion.com/embed/video/' + lp.id + '?autoplay=1';
+        case 'tt': return 'https://www.tiktok.com/embed/v2/' + lp.id;
+        case 'fb': return 'https://www.facebook.com/plugins/video.php?href=' + u + '&show_text=false&autoplay=true';
+        case 'sp': return 'https://open.spotify.com/embed/' + lp.sp + '/' + lp.id;
+        case 'sc': return 'https://w.soundcloud.com/player/?auto_play=true&url=' + u;
+        case 'gd': return 'https://drive.google.com/file/d/' + lp.id + '/preview';
+        case 'web': return lp.url;
+    }
+    return null;
+}
+function ensureLP(m) {
+    if (m.lp !== undefined || !m.text || m.deleted || m.system) return;
+    const us = urlsIn(m.text);
+    if (!us.length) { m.lp = null; return; }
+    m.lp = classify(us[0]);
+    saveMsg(m);
+    fetchMeta(m);
+}
+async function fetchMeta(m) {
+    const lp = m.lp;
+    if (!lp || lp.metaDone || metaBusy.has(m.id) || !navigator.onLine) return;
+    metaBusy.add(m.id);
+    const j = async u => {
+        const c = new AbortController(), t = setTimeout(() => c.abort(), 7000);
+        try { return await (await fetch(u, { signal: c.signal })).json(); } finally { clearTimeout(t); }
+    };
+    try {
+        if (lp.kind === 'yt') {
+            const d = await j('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(lp.url));
+            if (d && d.title) { lp.title = d.title; lp.site = d.author_name || 'YouTube'; }
+        } else if (['vimeo', 'dm', 'tt', 'sp', 'sc'].includes(lp.kind)) {
+            const d = await j('https://noembed.com/embed?url=' + encodeURIComponent(lp.url));
+            if (d && !d.error) { if (d.title) lp.title = d.title; if (d.thumbnail_url) lp.img = d.thumbnail_url; if (d.author_name) lp.site = d.author_name; }
+        } else if (lp.kind === 'web' || lp.kind === 'ig' || lp.kind === 'fb') {
+            const d = await j('https://api.microlink.io/?url=' + encodeURIComponent(lp.url));
+            const x = d && d.data;
+            if (x) {
+                if (x.title) lp.title = x.title;
+                if (x.description) lp.desc = x.description;
+                if (x.image && x.image.url) lp.img = x.image.url;
+                if (x.publisher) lp.site = x.publisher;
+            }
+        }
+        lp.metaDone = true;
+    } catch (e) { lp.metaTries = (lp.metaTries || 0) + 1; if (lp.metaTries > 2) lp.metaDone = true; }
+    metaBusy.delete(m.id);
+    saveMsg(m); redraw();
+}
+function lpHTML(m) {
+    ensureLP(m);
+    const lp = m.lp;
+    if (!lp || m.deleted) return '';
+    const k = lp.kind;
+    if (k === 'img') return '<img class="rd-lpimg" data-lpimg="' + esc(lp.url) + '" src="' + esc(lp.url) + '" loading="lazy" alt="">';
+    if (k === 'vid') return '<video class="rd-vid" controls playsinline preload="metadata" src="' + esc(lp.url) + '"></video>';
+    if (k === 'aud') return '<audio class="rd-aud" controls preload="none" src="' + esc(lp.url) + '"></audio>';
+    if (k === 'file') return '';
+    const play = !!LP_NAMES[k];
+    const th = lp.img ? '<div class="rd-lpth" style="background-image:url(\'' + esc(lp.img) + '\')"></div>' : '<div class="rd-lpth ph ' + k + '">' + (play ? '▶' : '🌐') + '</div>';
+    const title = lp.title || (LP_NAMES[k] ? LP_NAMES[k] + (k === 'ig' ? (lp.igType === 'reel' ? ' reel' : ' post') : ' video') : lp.host);
+    const sub = (lp.site || lp.host) + (lp.desc ? ' · ' + lp.desc.slice(0, 70) : '');
+    return '<div class="rd-lp" data-lp="' + m.id + '">' + th + (play ? '<span class="rd-play">▶</span>' : '') + '<div class="rd-lpb"><b>' + esc(title) + '</b><small>' + esc(sub) + '</small></div></div>';
+}
+function openPlayer(lp) {
+    const url = embedUrl(lp);
+    if (!url) { window.open(lp.url, '_blank', 'noopener'); return; }
+    let pl = $('rdPlayer');
+    if (!pl) {
+        $('rdApp').insertAdjacentHTML('beforeend', '<div id="rdPlayer" hidden><div class="ph"><button class="rd-ibtn" id="rdPlayBack"></button><b id="rdPlayTitle"></b><button class="rd-ibtn" id="rdPlayOpen" title="Open in browser">↗</button></div><iframe id="rdPlayFrame" allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>');
+        $('rdPlayBack').innerHTML = ic('back', 24);
+        $('rdPlayBack').onclick = goBack;
+        $('rdPlayOpen').onclick = () => { const u = $('rdPlayOpen').dataset.url; if (u) window.open(u, '_blank', 'noopener'); };
+        pl = $('rdPlayer');
+    }
+    $('rdPlayTitle').textContent = lp.title || lp.host;
+    $('rdPlayOpen').dataset.url = lp.url;
+    $('rdPlayFrame').src = url;
+    pl.hidden = false;
+    pushLayer('player');
+}
+
+/* ---- gallery / albums / profile media ---- */
+const isMediaKind = m => m.media && ['image', 'video'].includes(mediaKind(m.media.type));
+function isAlbumMsg(m) { return !!(m.album && m.media && !m.deleted && !m.rx && !m.voice && !m.system && !m.media.failed && isMediaKind(m)); }
+function chatMediaMsgs(w) { return msgs.filter(m => m.chat === w && m.media && !m.deleted && !m.rx && !m.voice && !m.media.failed && isMediaKind(m)); }
+function chatMediaIds(w) { return chatMediaMsgs(w).map(m => m.id); }
+function chatFileMsgs(w) { return msgs.filter(m => m.chat === w && m.media && !m.deleted && !m.rx && !m.voice && !m.media.failed && !isMediaKind(m)); }
+function chatLinks(w) {
+    const out = [], seen = new Set();
+    msgs.forEach(m => {
+        if (m.chat !== w || m.deleted || m.system || !m.text) return;
+        urlsIn(m.text).forEach(u => { if (!seen.has(u)) { seen.add(u); out.push({ u, m }); } });
+    });
+    return out;
+}
+function rowIds(row) { return (row.dataset.ids || row.dataset.id).split(','); }
+function toggleSelRow(row) {
+    const ids = rowIds(row);
+    const all = ids.every(i => sel.has(i));
+    ids.forEach(i => all ? sel.delete(i) : sel.add(i));
+    if (!sel.size) exitSel(); else updateSel();
+}
+function albumHTML(grp, first) {
+    const out = grp[0].from === 'me', last = grp[grp.length - 1], n = grp.length;
+    const tiles = grp.slice(0, 4).map((m, i) => {
+        const k = mediaKind(m.media.type), u = urlCache[m.id], ok = u ? ' data-ok="1"' : '';
+        const el = k === 'image'
+            ? '<img data-mid="' + m.id + '"' + ok + (u ? ' src="' + u + '"' : '') + ' alt="">'
+            : '<video data-mid="' + m.id + '"' + ok + ' muted preload="metadata"' + (u ? ' src="' + u + '"' : '') + '></video><span class="pl">▶</span>';
+        const more = (i === 3 && n > 4) ? '<span class="more">+' + (n - 3) + '</span>' : '';
+        return '<div class="rd-at" data-gi="' + m.id + '">' + el + more + '</div>';
+    }).join('');
+    const cap = grp.filter(m => m.text).map(m => '<div class="rd-txt">' + linkify(m.text) + '</div>').join('');
+    let worst = 'seen';
+    grp.forEach(m => { if ((RANK[m.status] || 0) < (RANK[worst] || 0)) worst = m.status; });
+    const st = out && !isLocal(last.chat) ? (TICK[worst] || TICK.sent) : '';
+    const ids = grp.map(m => m.id);
+    return '<div class="rd-row ' + (out ? 'out' : 'in') + (first ? ' first' : '') + (ids.every(i => sel.has(i)) ? ' sel' : '') + '" data-id="' + ids[0] + '" data-ids="' + ids.join(',') + '"><div class="rd-bub"><div class="rd-album n' + Math.min(n, 4) + '">' + tiles + '</div>' + cap + '<span class="rd-meta">' + fmtTime(last.ts) + st + '</span></div></div>';
+}
+let gal = { ids: [], i: 0 };
+function ensureViewerUI() {
+    if ($('rdViewerVid')) return;
+    const v = $('rdViewer');
+    v.insertAdjacentHTML('beforeend', '<video id="rdViewerVid" controls playsinline hidden></video><button class="rdnav" id="rdViewerPrev" style="left:10px" hidden>‹</button><button class="rdnav" id="rdViewerNext" style="right:10px" hidden>›</button><div id="rdViewerCnt" hidden></div>');
+    $('rdViewerPrev').onclick = () => galStep(-1);
+    $('rdViewerNext').onclick = () => galStep(1);
+    let x0 = null;
+    v.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+    v.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 60 && gal.ids.length > 1 && !$('rdViewerCnt').hidden) galStep(dx < 0 ? 1 : -1); });
+}
+function viewerSingleMode() {
+    ensureViewerUI();
+    ['rdViewerPrev', 'rdViewerNext', 'rdViewerCnt', 'rdViewerVid'].forEach(i => { $(i).hidden = true; });
+    gal.ids = [];
+}
+function openGallery(ids, startId) {
+    gal.ids = ids.filter(id => { const m = getMsg(id); return m && m.media; });
+    if (!gal.ids.length) return;
+    gal.i = Math.max(0, gal.ids.indexOf(startId));
+    ensureViewerUI();
+    $('rdViewerLetter').hidden = true;
+    $('rdViewer').hidden = false;
+    pushLayer('viewer');
+    galShow();
+}
+async function galShow() {
+    const id = gal.ids[gal.i], m = getMsg(id);
+    if (!m) return;
+    const img = $('rdViewerImg'), vid = $('rdViewerVid');
+    try { vid.pause(); } catch (e) {}
+    const u = await getURL(id);
+    if (!u) { toast('Media load nahi hua'); return; }
+    if (mediaKind(m.media.type) === 'video') { img.hidden = true; img.removeAttribute('src'); vid.hidden = false; vid.src = u; vid.play().catch(() => {}); }
+    else { vid.hidden = true; vid.removeAttribute('src'); img.hidden = false; img.src = u; }
+    const multi = gal.ids.length > 1;
+    $('rdViewerCnt').textContent = (gal.i + 1) + ' / ' + gal.ids.length;
+    $('rdViewerCnt').hidden = !multi;
+    $('rdViewerPrev').hidden = !multi || gal.i <= 0;
+    $('rdViewerNext').hidden = !multi || gal.i >= gal.ids.length - 1;
+}
+function galStep(d) { const n = gal.i + d; if (n < 0 || n >= gal.ids.length) return; gal.i = n; galShow(); }
+
+/* ---- profile page: Media + Links & Files (sab local storage se) ---- */
+let profTab = 'media';
+function fileIcon(name) {
+    const e = (String(name).split('.').pop() || '').toLowerCase();
+    return e === 'apk' ? '📦' : e === 'pdf' ? '📕' : /^(zip|rar|7z)$/.test(e) ? '🗜️' : /^docx?$/.test(e) ? '📘' : /^xlsx?$/.test(e) ? '📗' : /^pptx?$/.test(e) ? '📙' : /^(mp3|m4a|wav|ogg|aac)$/.test(e) ? '🎵' : '📄';
+}
+async function openFileItem(id) {
+    const m = getMsg(id);
+    if (!m || !m.media) return;
+    const u = await getURL(id);
+    if (!u) { toast('File load nahi hui'); return; }
+    const a = document.createElement('a');
+    a.href = u; a.download = m.media.name || 'file'; a.target = '_blank';
+    document.body.appendChild(a); a.click(); a.remove();
+}
+function buildProfTabs() {
+    const host = document.querySelector('.rd-prof');
+    if (!host) return;
+    if (!$('rdPTabs')) {
+        host.insertAdjacentHTML('beforeend', '<div class="rd-ptabs" id="rdPTabs"><button data-ptab="media">Media</button><button data-ptab="files">Links &amp; Files</button></div><div id="rdPBody"></div>');
+        $('rdPTabs').addEventListener('click', e => { const b = e.target.closest('[data-ptab]'); if (b) { profTab = b.dataset.ptab; renderProfTab(); } });
+        $('rdPBody').addEventListener('click', e => {
+            const g = e.target.closest('[data-pg]');
+            if (g) { openGallery(chatMediaIds(profChat), g.dataset.pg); return; }
+            const f = e.target.closest('[data-pf]');
+            if (f) { openFileItem(f.dataset.pf); return; }
+            const l = e.target.closest('[data-pl]');
+            if (l) { const lp = classify(l.dataset.pl); if (LP_NAMES[lp.kind]) openPlayer(lp); else window.open(l.dataset.pl, '_blank', 'noopener'); }
+        });
+    }
+    renderProfTab();
+}
+function renderProfTab() {
+    const tabs = $('rdPTabs'), body = $('rdPBody');
+    if (!tabs || !body) return;
+    const med = chatMediaMsgs(profChat).slice().reverse();
+    const files = chatFileMsgs(profChat).slice().reverse();
+    const links = chatLinks(profChat).reverse();
+    tabs.querySelector('[data-ptab="media"]').textContent = 'Media' + (med.length ? ' (' + med.length + ')' : '');
+    tabs.querySelector('[data-ptab="files"]').textContent = 'Links & Files' + (files.length + links.length ? ' (' + (files.length + links.length) + ')' : '');
+    tabs.querySelectorAll('[data-ptab]').forEach(b => b.classList.toggle('on', b.dataset.ptab === profTab));
+    if (profTab === 'media') {
+        body.innerHTML = med.length
+            ? '<div class="rd-pgrid">' + med.map(m => '<div class="rd-pcell" data-pg="' + m.id + '">' + (mediaKind(m.media.type) === 'image' ? '<img data-mid="' + m.id + '" alt="">' : '<video data-mid="' + m.id + '" muted preload="metadata"></video><span class="pl">▶</span>') + '</div>').join('') + '</div>'
+            : '<div class="rd-pnone">Abhi koi photo ya video nahi hai</div>';
+    } else {
+        let h = '';
+        if (files.length) h += '<div class="rd-plist">' + files.map(m => '<div class="rd-pit" data-pf="' + m.id + '"><span class="ic">' + fileIcon(m.media.name) + '</span><div><b>' + esc(m.media.name) + '</b><small>' + fmtSize(m.media.size) + ' · ' + new Date(m.ts).toLocaleDateString([], { day: 'numeric', month: 'short' }) + '</small></div></div>').join('') + '</div>';
+        if (links.length) h += '<div class="rd-plist" style="margin-top:8px">' + links.map(x => { ensureLP(x.m); const lp = x.m.lp; return '<div class="rd-pit" data-pl="' + esc(x.u) + '"><span class="ic">' + (lp && LP_NAMES[lp.kind] ? '▶' : '🔗') + '</span><div><b>' + esc((lp && lp.title) || x.u) + '</b><small>' + esc(x.u) + '</small></div></div>'; }).join('') + '</div>';
+        body.innerHTML = h || '<div class="rd-pnone">Abhi koi link ya file nahi hai</div>';
+    }
+    hydrate(body);
 }
 
 /* ------------------------------ RENDERING ------------------------------ */
@@ -911,7 +1491,8 @@ function callHTML(m, first) {
 }
 function msgHTML(m, first) {
     if (m.system && m.cl) return callHTML(m, first);
-    if (m.system) return '<div class="rd-sys' + (m.sk === 'call' ? ' call' : '') + '">' + (m.sk === 'call' ? '📞 ' : '') + esc(m.text) + '</div>';
+    if (m.system && m.sk === 'react') return '<div class="rd-sys react" data-sysid="' + m.id + '"><span>' + esc(m.text) + '</span>' + (m.snip ? '<small>“' + esc(m.snip) + '”</small>' : '') + '</div>';
+    if (m.system) return '<div class="rd-sys' + (m.sk === 'call' ? ' call' : m.sk === 'nick' ? ' nick' : '') + '" data-sysid="' + m.id + '">' + (m.sk === 'call' ? '📞 ' : '') + esc(m.text) + '</div>';
     const out = m.from === 'me';
     let inner = ''; if (m.reply && !m.deleted) inner += '<div class="rd-quote" data-qid="' + esc(m.reply.id) + '"><b>' + esc(m.reply.who === 'me' ? 'You' : chatName(m.chat)) + '</b><span>' + esc(m.reply.t) + '</span></div>'; inner += m.fwd && !m.deleted ? '<div class="rd-fwd">↪ Forwarded</div>' : '';
     if (m.deleted) inner += '<span class="rd-del">🚫 ' + (out ? 'You deleted this message' : 'This message was deleted') + '</span>';
@@ -921,9 +1502,9 @@ function msgHTML(m, first) {
             if (m.media) inner += mediaHTML(m);
             if (m.prog != null) inner += '<div class="rd-prog" data-prog="' + m.id + '"><span>Sending ' + m.prog + '%</span><div class="rd-pbar"><i style="width:' + m.prog + '%"></i></div></div>';
         }
-        if (m.text) inner += '<div class="rd-txt">' + esc(m.text) + '</div>';
+        if (m.text) inner += '<div class="rd-txt">' + linkify(m.text) + '</div>' + lpHTML(m);
     }
-    const st = out && !m.deleted && m.chat !== 'saved' ? (TICK[m.status] || TICK.sent) : '';
+    const st = out && !m.deleted && !isLocal(m.chat) ? (TICK[m.status] || TICK.sent) : '';
     const meta = '<span class="rd-meta">' + (m.edited && !m.deleted ? 'edited ' : '') + fmtTime(m.ts) + st + '</span>';
     const r = m.reactions || {};
     const re = [r.me, r.peer].filter(Boolean);
@@ -938,11 +1519,16 @@ function renderMessages(force) {
     const list = all.slice(-renderLimit);
     let html = all.length > list.length ? '<div class="rd-more" data-more="1">Load earlier messages</div>' : '';
     let last = '', prev = null;
-    for (const m of list) {
+    for (let i = 0; i < list.length; i++) {
+        const m = list[i];
         const k = dayKey(m.ts);
         if (k !== last) { html += '<div class="rd-day">' + esc(dayLabel(m.ts)) + '</div>'; last = k; prev = null; }
         const first = !prev || prev.system || prev.from !== m.from;
-        html += msgHTML(m, first);
+        if (isAlbumMsg(m)) {
+            const grp = [m];
+            while (i + 1 < list.length && isAlbumMsg(list[i + 1]) && list[i + 1].album === m.album && list[i + 1].from === m.from && dayKey(list[i + 1].ts) === k) grp.push(list[++i]);
+            html += grp.length > 1 ? albumHTML(grp, first) : msgHTML(m, first);
+        } else html += msgHTML(m, first);
         prev = m;
     }
     box.innerHTML = html;
@@ -970,8 +1556,8 @@ async function getURL(id) {
     const m = getMsg(id);
     return (m && m.media && m.media.url) || null;
 }
-function hydrate() {
-    document.querySelectorAll('#rdMsgs [data-mid]').forEach(el => {
+function hydrate(root) {
+    (root || $('rdMsgs')).querySelectorAll('[data-mid]').forEach(el => {
         if (el.dataset.ok) return;
         getURL(el.dataset.mid).then(u => {
             if (!u) return;
@@ -987,20 +1573,20 @@ function previewOf(m) {
     else if (m.system) t = m.text;
     else if (m.media) { const k = mediaKind(m.media.type); t = m.voice ? '🎤 Voice message' : k === 'image' ? '📷 Photo' : k === 'video' ? '🎥 Video' : k === 'audio' ? '🎵 Audio' : '📄 ' + m.media.name; if (m.text) t += ' ' + m.text; }
     else t = m.text;
-    return (m.from === 'me' && !m.system && m.chat !== 'saved' ? 'You: ' : '') + t;
+    return (m.from === 'me' && !m.system && !isLocal(m.chat) ? 'You: ' : '') + t;
 }
 function renderList() {
     const el = $('rdChatList');
     if (!el || !PEER) return;
     const q = (($('rdSearch') && $('rdSearch').value) || '').trim().toLowerCase();
-    let rows = ['p2p', 'tg', 'saved'].map(id => ({ id, name: chatName(id) }));
+    let rows = ['p2p', 'tg', 'me', 'saved'].map(id => ({ id, name: chatName(id) }));
     if (q) rows = rows.filter(r => (r.name + ' ' + nameOf(r.id)).toLowerCase().includes(q));
     if (!rows.length) { el.innerHTML = '<div class="rd-empty">Koi chat nahi mili</div>'; return; }
     el.innerHTML = rows.map(r => {
         let last = null, unread = 0;
         for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].chat === r.id) { if (!last) last = msgs[i]; } }
         msgs.forEach(m => { if (m.chat === r.id && m.from === 'peer' && !m.read) unread++; });
-        let sub = last ? previewOf(last) : (r.id === 'p2p' ? (dcOpen() ? 'connected' : peerOnline ? 'online' : 'Tap to chat') : r.id === 'saved' ? 'Save anything here' : 'Tap to chat');
+        let sub = last ? previewOf(last) : (r.id === 'p2p' ? (dcOpen() ? 'connected' : peerOnline ? 'online' : 'Tap to chat') : r.id === 'saved' ? 'Save anything here' : r.id === 'me' ? 'Message yourself' : 'Tap to chat');
         let cls = '';
         if (r.id === 'p2p' && peerTyping) { sub = 'typing…'; cls = ' class="rd-typ"'; }
         return '<div class="rd-item" data-chat="' + r.id + '">' + avHTML(r.id) + '<div class="rd-it-mid"><b>' + esc(r.name) + '</b><span' + cls + '>' + esc(sub) + '</span></div><div class="rd-it-r">' + (last ? fmtTime(last.ts) : '') + (unread ? '<br><span class="rd-badge">' + unread + '</span>' : '') + '</div></div>';
@@ -1015,6 +1601,7 @@ function updateSub() {
     el.classList.remove('typing');
     if (curChat === 'tg') { el.textContent = 'Telegram bot'; return; }
     if (curChat === 'saved') { el.textContent = 'Only on this device'; return; }
+    if (curChat === 'me') { el.textContent = 'Message yourself'; return; }
     if (peerTyping) { el.textContent = 'typing…'; el.classList.add('typing'); }
     else el.textContent = statusText();
     syncTypingBubble();
@@ -1054,7 +1641,7 @@ function markRead() {
             if (curChat === 'p2p' && !m.system) ids.push(m.id);
         }
     });
-    if (ids.length) queueEvt({ t: 'ack', id: uid(), ids, s: 'seen' });
+    if (ids.length) { queueEvt({ t: 'ack', id: uid(), ids, s: 'seen' }); readSync(ids); }
     renderList();
 }
 
@@ -1125,7 +1712,7 @@ function openForward() {
     if (!ids.length) return;
     fwdIds = ids;
     openLayerUI('<div class="rd-pop" style="top:90px;left:18px;right:18px"><div class="ttl">Forward to…</div>' +
-        ['p2p', 'tg', 'saved'].map(w => '<button class="rd-fwd-item" data-fwd="' + w + '">' + avHTML(w).replace('data-avof', 'data-x') + '<span style="font-size:17px;font-weight:600">' + esc(chatName(w)) + '</span></button>').join('') + '</div>');
+        ['p2p', 'tg', 'me', 'saved'].map(w => '<button class="rd-fwd-item" data-fwd="' + w + '">' + avHTML(w).replace('data-avof', 'data-x') + '<span style="font-size:17px;font-weight:600">' + esc(chatName(w)) + '</span></button>').join('') + '</div>');
 }
 let fwdIds = [];
 async function doForward(to) {
@@ -1142,7 +1729,7 @@ async function doForward(to) {
         } else if (m.media) { fail++; continue; }
         if (to === 'p2p') await p2pSend({ text: m.text, file, voice: m.voice, fwd: true });
         else if (to === 'tg') { if (file) await tgSendFile(file, m.voice); if (m.text) await tgSendText(m.text); }
-        else await savedAdd({ text: m.text, file, voice: m.voice, fwd: true });
+        else await savedAdd({ text: m.text, file, voice: m.voice, fwd: true }, to);
     }
     toast(fail ? ('Forward hua, ' + fail + ' file nahi ja saki') : ('Forwarded to ' + chatName(to) + ' ✓'));
     renderList();
@@ -1158,7 +1745,7 @@ function openSelMore() {
     if (!ms.length) return;
     const acts = [];
     if (ms.length === 1 && ms[0].text && !ms[0].media && !ms[0].voice) acts.push(['edit', ic('edit', 20) + 'Edit']);
-    if (ms.every(m => m.chat !== 'saved')) acts.push(['unsend', ic('undo', 20) + 'Unsend']);
+    if (ms.every(m => !isLocal(m.chat))) acts.push(['unsend', ic('undo', 20) + 'Unsend']);
     if (!acts.length) { toast('Is message par koi option nahi'); return; }
     openLayerUI('<div class="rd-pop" style="top:56px;right:10px">' + acts.map(a => '<button data-selmore="' + a[0] + '">' + a[1] + '</button>').join('') + '</div>');
 }
@@ -1186,7 +1773,7 @@ function openCtx(id, row) {
     if (!isCall && !m.deleted && m.text) acts.push(['copy', ic('copy', 20) + 'Copy']);
     if (!isCall && !m.deleted) acts.push(['fwd', ic('forward', 20) + 'Forward']);
     if (m.from === 'me' && !m.deleted && m.text && !m.media && !m.voice && !isCall) acts.push(['edit', ic('edit', 20) + 'Edit']);
-    if (m.from === 'me' && !m.deleted && m.chat !== 'saved' && !isCall) acts.push(['unsend', ic('undo', 20) + 'Unsend']);
+    if (m.from === 'me' && !m.deleted && !isLocal(m.chat) && !isCall) acts.push(['unsend', ic('undo', 20) + 'Unsend']);
     acts.push(['del', ic('trash', 20) + 'Delete for me']);
     const need = acts.length * 50 + (canReact ? 62 : 0) + 30;
     const top = Math.max(70, Math.min(r.top - 62, vh - need - 20));
@@ -1198,8 +1785,8 @@ function openCtx(id, row) {
 }
 function openMenu() {
     const items = [];
-    if (curChat === 'p2p' || curChat === 'tg') items.push(['profile', 'user', 'Profile']);
-    items.push(['select', 'list', 'Select messages'], ['clear', 'trash', 'Delete chat']);
+    items.push(['profile', 'user', 'Profile']);
+    items.push(['select', 'list', 'Select messages'], ['clear', 'trash', 'Delete chat'], ['clean', 'trash', 'Clean server data']);
     openLayerUI('<div class="rd-pop" style="top:56px;right:10px">' + items.map(i => '<button data-menu="' + i[0] + '">' + ic(i[1], 20) + i[2] + '</button>').join('') + '</div>');
 }
 function openSheet() {
@@ -1210,6 +1797,7 @@ function openEmoji() {
     openLayerUI('<div class="rd-emoji">' + EMOJIS.map(e => '<button data-emoji="' + e + '">' + e + '</button>').join('') + '</div>');
 }
 function openViewer(src) {
+    viewerSingleMode();
     $('rdViewerImg').src = src;
     $('rdViewerImg').hidden = false;
     $('rdViewerLetter').hidden = true;
@@ -1217,7 +1805,8 @@ function openViewer(src) {
     pushLayer('viewer');
 }
 function openAvatarViewer(which) {
-    if ((which === 'p2p' || which === 'tg') && photos[which]) { openViewer(photos[which]); return; }
+    if (photos[which]) { openViewer(photos[which]); return; }
+    viewerSingleMode();
     const L = $('rdViewerLetter');
     paintAv(L, which, 'big');
     L.hidden = false;
@@ -1227,10 +1816,11 @@ function openAvatarViewer(which) {
 }
 function openProfile(which) {
     which = (typeof which === 'string') ? which : curChat;
-    if (which !== 'p2p' && which !== 'tg') return;
+    if (!['p2p', 'tg', 'me', 'saved'].includes(which)) return;
     profChat = which;
     applyNames(); updateSub();
     if ($('rdNickIn')) setNickRow(false);
+    buildProfTabs();
     pushLayer('profile');
     showScreen('rdProfile');
 }
@@ -1248,18 +1838,29 @@ function setNickRow(editing) {
     }
 }
 function saveNick() {
-    nicks[profChat] = ($('rdNickIn').value || '').trim();
-    dbPut('kv', nicks[profChat], 'nick_' + pkey(profChat));
-    setNickRow(false); renderList();
+    const w = profChat;
+    if (!canEditProf(w)) return;
+    const nv = ($('rdNickIn').value || '').trim();
+    if (w === 'me') {
+        const old = selfNick;
+        if (nv !== old) {
+            selfNick = nv; dbPut('kv', nv, 'nick_' + ME);
+            const id = uid();
+            addNickLine(true, id, '', nv);     // "You changed nickname to ..." (beech chat me)
+            sendProfile('nick', old, id);       // samne wale ko "<purana nickname> changed nickname to ..."
+        }
+    } else { nicks[w] = nv; dbPut('kv', nv, 'nick_' + pkey(w)); }
+    setNickRow(false); renderList(); applyNames();
 }
 function cancelNick() { if ($('rdNickIn')) setNickRow(false); }
 function setPhoto(file) {
-    if (!file) return;
+    if (!file || !canEditProf(profChat)) return;
     const w = profChat;
     startCrop(file, async blob => {
         if (!blob) return;
         await dbPut('blobs', blob, 'photo_' + pkey(w));
         await loadProfile();
+        if (w === 'me') sendProfile('photo');
         toast('Profile photo set ✓');
     });
 }
@@ -1446,7 +2047,7 @@ function doSend() {
     if (!t.trim()) return;
     if (editingId) commitEdit(t);
     else if (curChat === 'tg') tgSendText(t, replyTo);
-    else if (curChat === 'saved') savedAdd({ text: t, reply: replyTo });
+    else if (isLocal(curChat)) savedAdd({ text: t, reply: replyTo }, curChat);
     else p2pSend({ text: t, reply: replyTo });
     inp.value = '';
     syncSendBtn();
@@ -1593,15 +2194,15 @@ function startCall(kind) {
         return;
     }
     call = newCall(kind, 'out', 'calling');
+    call.id = uid();
     showCall('Calling…');
     call.ready = acquireLocal(); // mic/camera pehle hi ready (preview + permission), tracks accept ke baad hi jaate hain
     call.ready.then(ok => { if (!ok && call) endCall(true, true); });
-    bsend('call', { a: 'invite', kind });
+    bcall({ a: 'invite', kind, cid: call.id, to: Array.from(peerDevs) });
     callTimer = setTimeout(() => {
         if (call && call.state === 'calling') {
-            bsend('call', { a: 'end' });
+            bcall({ a: 'end', to: Array.from(peerDevs) });
             logCall(kind, 'out', 'noans');
-            
             endCall(false, true);
         }
     }, 40000);
@@ -1652,34 +2253,42 @@ function attachTracks() {
 }
 function onCallMsg(p) {
     if (!p || !appOpen) return;
+    if (p.fu === ME) { // meri apni dusri device ne call utha li / kaat di
+        if (p.a === 'answered' && call && call.state === 'ringing' && call.id === p.cid) { clearTimeout(callTimer); hideIncoming(); call = null; }
+        return;
+    }
+    if (p.to && !p.to.includes(DEV)) return;
+    if (p.td && p.td !== DEV) return;
     if (p.a === 'invite') {
-        if (call) { bsend('call', { a: 'busy' }); return; }
+        if (call) { bcall({ a: 'busy', td: p.fd, cid: p.cid }); return; }
         call = newCall(p.kind === 'video' ? 'video' : 'audio', 'in', 'ringing');
+        call.id = p.cid; call.peerDev = p.fd;
         showIncoming();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
         callTimer = setTimeout(() => {
             if (call && call.state === 'ringing') { hideIncoming(); logCall(call.kind, 'in', 'missed'); call = null; }
         }, 42000);
-    } else if (p.a === 'accept') {
-        if (call && call.dir === 'out' && call.state === 'calling') {
+        return;
+    }
+    if (!call || (p.cid && call.id && p.cid !== call.id)) return;
+    if (p.a === 'accept') {
+        if (call.dir === 'out' && call.state === 'calling') {
             clearTimeout(callTimer);
-            call.state = 'connecting';
+            call.state = 'connecting'; call.peerDev = p.fd;
             setCallStatus('Connecting…');
+            rebind(p.fd);
             call.ready.then(ok => { if (!ok) { endCall(true, true); return; } if (call) attachTracks(); });
         }
     } else if (p.a === 'reject') {
-        if (call && call.dir === 'out') { logCall(call.kind, 'out', 'declined'); endCall(false, true); }
+        if (call.dir === 'out') { logCall(call.kind, 'out', 'declined'); endCall(false, true); }
     } else if (p.a === 'busy') {
-        if (call && call.dir === 'out') { logCall(call.kind, 'out', 'busy'); endCall(false, true); }
+        if (call.dir === 'out') { logCall(call.kind, 'out', 'busy'); endCall(false, true); }
     } else if (p.a === 'screen') {
-        if (call) {
-            call.remoteShare = !!p.on;
-            refreshCallUI();
-            banner(p.on ? peerName() + ' is sharing screen' : '');
-            if (p.on) setTimeout(() => banner(''), 3500);
-        }
+        call.remoteShare = !!p.on;
+        refreshCallUI();
+        banner(p.on ? peerName() + ' is sharing screen' : '');
+        if (p.on) setTimeout(() => banner(''), 3500);
     } else if (p.a === 'end') {
-        if (!call) return;
         if (call.state === 'ringing') { clearTimeout(callTimer); hideIncoming(); logCall(call.kind, 'in', 'missed'); call = null; }
         else endCall(false);
     }
@@ -1690,17 +2299,20 @@ async function acceptCall() {
     hideIncoming();
     call.state = 'connecting';
     showCall('Connecting…');
+    rebind(call.peerDev); // jis device se call aayi usi se P2P jodo
     ensurePC();
     call.ready = acquireLocal();
     const ok = await call.ready;
-    if (!ok) { bsend('call', { a: 'end' }); endCall(false, true); return; }
-    if (!attachTracks()) { bsend('call', { a: 'end' }); endCall(false, true); return; }
-    bsend('call', { a: 'accept' });
+    if (!ok) { bcall({ a: 'end' }); endCall(false, true); return; }
+    if (!attachTracks()) { bcall({ a: 'end' }); endCall(false, true); return; }
+    bcall({ a: 'accept' });
+    if (selfDevs.size) bcall({ a: 'answered', to: Array.from(selfDevs) });
 }
 function rejectCall() {
     if (!call || call.state !== 'ringing') return;
     clearTimeout(callTimer);
-    bsend('call', { a: 'reject' });
+    bcall({ a: 'reject' });
+    if (selfDevs.size) bcall({ a: 'answered', to: Array.from(selfDevs) });
     hideIncoming();
     logCall(call.kind, 'in', 'declined');
     call = null;
@@ -1799,7 +2411,7 @@ function endCall(sendEnd, silent) {
     const c = call;
     call = null;
     clearTimeout(callTimer); clearInterval(callTick); clearTimeout(c.watch); clearInterval(c.qt);
-    if (sendEnd) bsend('call', { a: 'end' });
+    if (sendEnd) bcall({ a: 'end' });
     if (c.share) { try { c.share.track.onended = null; c.share.track.stop(); } catch (e) {} }
     if (c.stream) c.stream.getTracks().forEach(t => t.stop());
     try { if (pc) pc.getSenders().forEach(s => { if (s.track) { try { pc.removeTrack(s); } catch (e) {} } }); } catch (e) {}
@@ -1810,6 +2422,7 @@ function endCall(sendEnd, silent) {
         if (c.t0) logCall(c.kind, c.dir, 'ok', Date.now() - c.t0);
         else logCall(c.kind, c.dir, c.state === 'calling' ? 'cancelled' : 'failed');
     }
+    linkOverride = null; setTimeout(evalLink, 0);
 }
 function toggleMute() {
     if (!call) return;
@@ -1860,7 +2473,7 @@ async function toggleShare() {
     if (call.vSender) { try { await call.vSender.replaceTrack(track); } catch (e) {} }
     else { call.vSender = pc.addTrack(track, ds); preferCodecs(call.vSender); call.shareAdded = true; }
     track.onended = () => stopShare();
-    bsend('call', { a: 'screen', on: true });
+    bcall({ a: 'screen', on: true });
     refreshCallUI();
     banner('Screen share chal rahi hai');
     setTimeout(() => banner(''), 3000);
@@ -1874,7 +2487,7 @@ async function stopShare() {
     try { sh.track.onended = null; sh.track.stop(); } catch (e) {}
     if (call.shareAdded) { try { pc.removeTrack(call.vSender); } catch (e) {} call.vSender = null; call.shareAdded = false; }
     else if (call.vSender && call.camTrack) { try { await call.vSender.replaceTrack(call.camTrack); } catch (e) {} }
-    bsend('call', { a: 'screen', on: false });
+    bcall({ a: 'screen', on: false });
     refreshCallUI();
     banner('');
     tuneSenders();
@@ -2087,7 +2700,9 @@ function wire() {
     $('rdRecSend').addEventListener('click', stopRec);
     ['rdFileMedia', 'rdFileCam', 'rdFileAudio', 'rdFileDoc'].forEach(id => {
         $(id).addEventListener('change', e => {
-            Array.from(e.target.files || []).forEach(f => sendFile(f, false));
+            const fs = Array.from(e.target.files || []);
+            const al = fs.length > 1 && fs.every(f => /^(image|video)\//.test(f.type)) ? uid() : undefined;
+            fs.forEach(f => sendFile(f, false, al));
             e.target.value = '';
         });
     });
@@ -2111,9 +2726,9 @@ function wire() {
             if (a.dataset.act === 'edit') startEdit(m.id);
             else if (a.dataset.act === 'reply') startReply(m.id);
             else if (a.dataset.act === 'copy') copyText(m.text);
-            else if (a.dataset.act === 'fwd') { sel = new Set([m.id]); updateSel(); toast('Aur messages select karo, phir forward dabao'); }
+            else if (a.dataset.act === 'fwd') { sel = new Set(ctxIds.length ? ctxIds : [m.id]); updateSel(); toast('Aur messages select karo, phir forward dabao'); }
             else if (a.dataset.act === 'unsend') unsend(m);
-            else if (a.dataset.act === 'del') deleteForMe([m.id]);
+            else if (a.dataset.act === 'del') deleteForMe(ctxIds.length ? ctxIds : [m.id]);
             return;
         }
         const mn = t.closest('[data-menu]');
@@ -2121,6 +2736,7 @@ function wire() {
             closeLayerUI();
             if (mn.dataset.menu === 'select') { sel = new Set(); updateSel(); toast('Message tap karke select karo'); }
             else if (mn.dataset.menu === 'profile') openProfile(curChat);
+            else if (mn.dataset.menu === 'clean') { if (confirm('Server (Supabase) par jo bhi data hai wo delete ho jayega — jo message abhi tak kisi device ne nahi liya wo bhi. Aapke phone ka local data safe rahega. Continue?')) cleanupSupabase(0).then(n => toast('Server saaf ho gaya (' + n + ' items)')); }
             else if (mn.dataset.menu === 'clear') { if (confirm('Poori chat clear kar de?')) clearChat(); }
             return;
         }
@@ -2148,7 +2764,7 @@ function wire() {
     // messages: long press / tap / scroll
     const box = $('rdMsgs');
     let lp = null, lpStart = null, lpFired = false, lastTapId = null, lastTapT = 0, tapTimer = 0;
-    const longPress = (id, row) => { if (selMode) toggleSel(id); else openCtx(id, row); };
+    const longPress = (id, row) => { if (selMode) toggleSelRow(row); else { ctxIds = rowIds(row); openCtx(id, row); } };
     box.addEventListener('pointerdown', e => {
         const row = e.target.closest('.rd-row');
         if (!row || e.target.closest('audio,video,a')) return;
@@ -2161,12 +2777,18 @@ function wire() {
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => box.addEventListener(t, () => { clearTimeout(lp); lp = null; }));
     box.addEventListener('click', e => {
         if (lpFired) { lpFired = false; return; }
+        const gi = e.target.closest('[data-gi]');
+        if (gi && !selMode) { openGallery(chatMediaIds(curChat), gi.dataset.gi); return; }
+        const lpEl = e.target.closest('[data-lp]');
+        if (lpEl && !selMode) { const mm = getMsg(lpEl.dataset.lp); if (mm && mm.lp) openPlayer(mm.lp); return; }
+        const lpi = e.target.closest('[data-lpimg]');
+        if (lpi && !selMode) { openViewer(lpi.dataset.lpimg); return; }
         const rt = e.target.closest('[data-retry]');
         if (rt) { const mm = getMsg(rt.dataset.retry); if (mm && mm.media) { if (mm.media.fid) tgFetchMedia(mm); } return; }
         if (e.target.closest('[data-more]')) { renderLimit += 150; renderMessages(false); return; }
         const row = e.target.closest('.rd-row');
         if (!row) return;
-        if (selMode) { toggleSel(row.dataset.id); return; }
+        if (selMode) { toggleSelRow(row); return; }
         const qq = e.target.closest('[data-qid]');
         if (qq) { jumpTo(qq.dataset.qid); return; }
         if (e.target.closest('audio,video,a')) return;
@@ -2175,7 +2797,7 @@ function wire() {
         lastTapId = rid; lastTapT = now;
         clearTimeout(tapTimer);
         const img = e.target.closest('img.rd-img');
-        if (img && img.src) { const src = img.src; tapTimer = setTimeout(() => openViewer(src), 300); }
+        if (img && img.src) { const mid = img.dataset.mid; tapTimer = setTimeout(() => openGallery(chatMediaIds(curChat), mid), 300); }
     });
     box.addEventListener('contextmenu', e => {
         const row = e.target.closest('.rd-row');
