@@ -219,7 +219,9 @@ const RANK = { pending: 0, sent: 1, delivered: 2, seen: 3 };
 let nicks = { p2p: '', tg: '' }, photos = { p2p: null, tg: null, me: null }, profChat = 'p2p', selfNick = '';
 const isLocal = c => c === 'saved' || c === 'me';
 const nameOf = w => w === 'p2p' ? (NAMES[PEER] || '') : w === 'me' ? (NAMES[ME] || '') : w === 'tg' ? 'Telegram' : 'Saved';
-const chatName = w => w === 'me' ? ((selfNick || NAMES[ME] || '') + ' (You)') : (nicks[w] || nameOf(w));
+let nickBy = '';
+const canEditNick = w => w === 'p2p' || w === 'me' || w === 'tg';
+const chatName = w => w === 'me' ? ((selfNick || nickBy || NAMES[ME] || '') + ' (You)') : (nicks[w] || nameOf(w));
 const peerName = () => chatName('p2p');
 const pkey = w => w === 'p2p' ? PEER : w === 'me' ? ME : 'tg';
 const nickOf = w => w === 'me' ? selfNick : (nicks[w] || '');
@@ -250,6 +252,7 @@ async function loadProfile() {
         if (photos[w]) { URL.revokeObjectURL(photos[w]); photos[w] = null; }
         if (b) photos[w] = URL.createObjectURL(b);
     }
+    nickBy = (await dbGet('kv', 'nickby')) || '';
     applyNames();
     renderList();
 }
@@ -259,8 +262,16 @@ function applyNames() {
     $('rdProfName').textContent = nameOf(profChat);
     const ce = canEditProf(profChat), nk = nickOf(profChat);
     const nt = $('rdNickTxt');
-    if (nt) { nt.textContent = nk || (ce ? 'Add nickname' : 'No nickname'); nt.style.opacity = nk ? '1' : '.5'; }
-    const ne = $('rdNickEdit'); if (ne) ne.hidden = !ce;
+    const cn = canEditNick(profChat);
+    if (nt) { nt.textContent = nk || (cn ? 'Add nickname' : 'No nickname'); nt.style.opacity = nk ? '1' : '.5'; }
+    const ne = $('rdNickEdit'); if (ne) ne.hidden = !cn;
+    const lbl = document.querySelector('.rd-prof-card small');
+    if (lbl) lbl.textContent = profChat === 'p2p' ? nameOf('p2p') + "'s nickname (set by you)" : profChat === 'me' ? 'Your nickname (only for you)' : 'Nickname';
+    let nb = $('rdNickBy');
+    if (profChat === 'p2p') {
+        if (!nb && $('rdNickRow')) { $('rdNickRow').insertAdjacentHTML('afterend', '<div id="rdNickBy" style="margin-top:18px"></div>'); nb = $('rdNickBy'); }
+        if (nb) { nb.hidden = false; nb.innerHTML = '<small style="display:block;color:var(--sub);font-size:13px;font-weight:600;margin-bottom:4px">Your nickname (set by ' + esc(nameOf('p2p')) + ')</small><div style="font-size:19px;font-weight:700;' + (nickBy ? '' : 'opacity:.5') + '">' + esc(nickBy || 'Not set') + '</div>'; }
+    } else if (nb) nb.hidden = true;
     const pb = $('rdProfPhotoBtn'); if (pb) pb.hidden = !ce;
     const card = document.querySelector('.rd-prof-card'); if (card) card.hidden = profChat === 'saved';
     $('rdCallName').textContent = peerName(); $('rdInName').textContent = peerName();
@@ -278,6 +289,9 @@ async function loadStore() {
     if (loaded) return;
     try {
         msgs = (await dbAll('msgs')) || [];
+        reactPrev = (await dbGet('kv', 'reactprev')) || {};
+        const oldRx = msgs.filter(m => m.sk === 'react');
+        if (oldRx.length) { oldRx.forEach(m => dbDel('msgs', m.id)); msgs = msgs.filter(m => m.sk !== 'react'); }
         outbox = (await dbGet('kv', 'outbox')) || [];
         tgOffset = (await dbGet('kv', 'tg_offset')) || 0;
     } catch (e) { msgs = []; }
@@ -360,8 +374,8 @@ function leaveApp() {
 
 /* ------------------------------ SUPABASE: devices, presence, signaling, offline queue ------------------------------ */
 const T_DEV = 'rd_devices';        // har device ka chhota record (last seen + multi-device delivery)
-const CLEAN_EVERY = 5 * 3600e3;    // har 5 ghante me server saaf (isse badal sakte ho: 10 * 3600e3)
-const KEEP_MS = 12 * 3600e3;       // server par koi bhi data isse zyada der nahi rukega
+const CLEAN_EVERY = 6 * 3600e3;    // har 6 ghante check: purana data hata do
+const KEEP_MS = 7 * 864e5;         // server par data 1 hafte tak rehta hai, uske baad apne aap delete (ya 3-dot menu > Clean server data se turant)
 const DEV_TTL = 7 * 864e5;         // 7 din se purani device ko message nahi bhejte
 let DEV = localStorage.getItem('rd_dev');
 if (!DEV) { DEV = Math.random().toString(36).slice(2, 10); try { localStorage.setItem('rd_dev', DEV); } catch (e) {} }
@@ -562,31 +576,37 @@ async function fetchPending() {
     if (!sb || !ME || !navigator.onLine || fetching || !appOpen) return;
     fetching = true;
     try {
-        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).in('to_dev', [DEV, '*']).order('created_at', { ascending: true }).limit(200);
+        const { data, error } = await sb.from(T_MSG).select('*').eq('to_user', ME).eq('consumed', false).in('to_dev', [DEV, '*']).order('created_at', { ascending: true }).limit(200);
         if (!error && data && data.length) {
             const done = [];
             for (const row of data) {
                 try { await handleEvt(row.payload); done.push(row); } catch (e) { /* agli baar dobara */ }
             }
             if (done.length) {
-                await sb.from(T_MSG).delete().in('id', done.map(r => r.id));
-                cleanMedia(done);
+                await sb.from(T_MSG).update({ consumed: true }).in('id', done.map(r => r.id)); // server par 1 hafte rehta hai, dobara deliver nahi hota
             }
             if (data.length >= 200) setTimeout(fetchPending, 300);
         }
     } catch (e) {}
     fetching = false;
 }
-async function cleanMedia(rows) {
-    for (const r of rows) {
-        const p = r.payload && r.payload.media && r.payload.media.path;
-        if (!p) continue;
-        try {
+async function freeSpace() {
+    // storage bhar jaye to: jo files sab devices utha chuke unhe hata do
+    if (!sb) return;
+    try {
+        const { data } = await sb.from(T_MSG).select('id,payload').eq('consumed', true).limit(500);
+        if (!data || !data.length) return;
+        const paths = new Set();
+        for (const r of data) {
+            const p = r.payload && r.payload.media && r.payload.media.path;
+            if (!p) continue;
             const base = String(r.id).split('~')[0];
-            const { count } = await sb.from(T_MSG).select('id', { count: 'exact', head: true }).like('id', base + '~%');
-            if (!count) await sb.storage.from(BUCKET).remove([p]); // sab devices le chuke -> file server se hata do
-        } catch (e) {}
-    }
+            const { count } = await sb.from(T_MSG).select('id', { count: 'exact', head: true }).like('id', base + '~%').eq('consumed', false);
+            if (!count) paths.add(p);
+        }
+        if (paths.size) await sb.storage.from(BUCKET).remove(Array.from(paths));
+        await sb.from(T_MSG).delete().in('id', data.map(r => r.id));
+    } catch (e) {}
 }
 /* ---- server saaf: data pehle phone ke local storage me aa chuka hota hai, phir server se delete ---- */
 async function maybeClean(force) {
@@ -865,6 +885,7 @@ async function handleEvt(e, blob) {
             renderList();
             return;
         case 'prof': return onProf(e, mine);
+        case 'nick': return onNick(e, mine);
         case 'typing':
             if (mine) return;
             peerTyping = !!e.on;
@@ -889,8 +910,8 @@ async function onMsg(e, blob, mine) {
         m.media = { name: e.media.name, type: e.media.type, size: e.media.size };
         if (!blob && e.media.path) {
             const { data, error } = await sb.storage.from(BUCKET).download(e.media.path);
-            if (error || !data) throw (error || new Error('download failed'));
-            blob = data;
+            if (error || !data) { if (!navigator.onLine) throw (error || new Error('offline')); blob = null; m.media.reason = 'Server se file hat chuki hai'; }
+            else blob = data;
         }
         if (blob) await dbPut('blobs', blob, m.id); else m.media.failed = true;
     }
@@ -927,7 +948,7 @@ async function smallPhoto() {
 }
 async function sendProfile(kind, old, id) {
     if (!ME) return;
-    const e = { t: 'prof', id: id || uid(), kind, nick: selfNick, old: old || '', ts: Date.now() };
+    const e = { t: 'prof', id: id || uid(), kind, nickFor: nicks.p2p || '', ts: Date.now() };
     if (kind === 'photo' || kind === 'hello') { const ph = await smallPhoto(); if (ph) e.photo = ph; }
     queueEvt(e);
     if (devsOf('self').size) queueEvt(Object.assign({}, e, { id: e.id + 'm' }), { to: 'self' });
@@ -938,22 +959,31 @@ function sendProfileHello() {
     clearTimeout(helloT);
     helloT = setTimeout(() => sendProfile('hello'), 900);
 }
-function addNickLine(mine, id, subject, nv) {
+function addNickLine(mine, id, nv) {
     const mid = 'nk_' + String(id).replace(/m$/, '');
     if (getMsg(mid)) return;
+    const who = nameOf('p2p');
     const text = mine
-        ? (nv ? 'You changed nickname to “' + nv + '”' : 'You removed your nickname')
-        : (nv ? subject + ' changed nickname to “' + nv + '”' : subject + ' removed nickname');
+        ? (nv ? 'You changed ' + who + "'s nickname to “" + nv + '”' : 'You removed ' + who + "'s nickname")
+        : (nv ? peerName() + ' changed your nickname to “' + nv + '”' : peerName() + ' removed your nickname');
     addMsg({ id: mid, chat: 'p2p', from: mine ? 'me' : 'peer', ts: Date.now(), system: true, sk: 'nick', text, local: true, status: 'sent', read: mine || (curChat === 'p2p' && !document.hidden), reactions: {} });
     redraw(true); renderList();
 }
+async function onNick(e, mine) {
+    const nv = (e.nick || '').trim();
+    if (mine) { nicks.p2p = nv; await dbPut('kv', nv, 'nick_' + PEER); }
+    else { nickBy = nv; await dbPut('kv', nv, 'nickby'); }
+    addNickLine(mine, e.id, nv);
+    applyNames(); renderList();
+}
 async function onProf(e, mine) {
     const who = mine ? ME : PEER;
-    const prev = mine ? selfNick : nicks.p2p;
-    const nv = (e.nick || '').trim();
-    await dbPut('kv', nv, 'nick_' + who);
     if (e.photo) { const b = dataURLtoBlob(e.photo); if (b) await dbPut('blobs', b, 'photo_' + who); }
-    if (e.kind === 'nick' && prev !== nv) addNickLine(mine, e.id, e.old || prev || NAMES[PEER], nv);
+    if (e.nickFor !== undefined) {
+        const nv = String(e.nickFor || '').trim();
+        if (mine) { nicks.p2p = nv; await dbPut('kv', nv, 'nick_' + PEER); }
+        else { nickBy = nv; await dbPut('kv', nv, 'nickby'); }
+    }
     await loadProfile();
 }
 function nickLineName() { return NAMES[PEER]; }
@@ -1016,7 +1046,7 @@ async function uploadMedia(m, evt) {
     const path = ME + '/' + m.id + '_' + safe;
     const up = () => sb.storage.from(BUCKET).upload(path, blob, { contentType: m.media.type || 'application/octet-stream', upsert: true });
     let r = await up();
-    if (r.error) { await cleanupSupabase(); r = await up(); } // storage bhar gaya ho to saaf karke dobara
+    if (r.error) { await freeSpace(); r = await up(); } // storage bhar gaya ho to jagah banakar dobara
     if (r.error) return false;
     evt.media.path = path;
     return true;
@@ -1074,22 +1104,20 @@ function applyReact(m, who, emoji) {
     const k = who === 'me' ? 'me' : 'peer';
     if (emoji) m.reactions[k] = emoji; else delete m.reactions[k];
     saveMsg(m); redraw();
-    reactLine(m, who, emoji);
+    setReactPrev(m, who, emoji);
 }
-function reactLine(m, who, emoji) {
-    if (m.chat !== 'p2p' || m.system) return;
-    const id = 'rx_' + m.id + '_' + who;
-    const ex = getMsg(id);
-    if (!emoji) { if (ex) deleteForMe([id]); return; }
-    const mineR = who === 'me', mineMsg = m.from === 'me';
-    const text = mineR
-        ? 'You reacted ' + emoji + ' to ' + (mineMsg ? 'your own message' : peerName() + "'s message")
-        : peerName() + ' reacted ' + emoji + ' to ' + (mineMsg ? 'your message' : 'their own message');
-    const snip = replyPreview(m).slice(0, 60);
-    if (ex) { ex.text = text; ex.em = emoji; ex.snip = snip; ex.ts = Date.now(); saveMsg(ex); msgs.sort((a, b) => a.ts - b.ts); redraw(true); renderList(); return; }
-    const open = curChat === 'p2p' && !document.hidden;
-    addMsg({ id, chat: 'p2p', from: mineR ? 'me' : 'peer', ts: Date.now(), system: true, sk: 'react', text, em: emoji, snip, local: true, status: 'sent', read: mineR || open, reactions: {} });
-    redraw(true); renderList();
+let reactPrev = {};
+function setReactPrev(m, who, emoji) {
+    const cur = reactPrev[m.chat];
+    if (!emoji) {
+        if (cur && cur.mid === m.id && cur.who === who) { delete reactPrev[m.chat]; dbPut('kv', reactPrev, 'reactprev'); renderList(); }
+        return;
+    }
+    const snip = replyPreview(m).slice(0, 40);
+    const text = (who === 'me' ? 'You' : peerName()) + ' reacted ' + emoji + ' to “' + snip + '”';
+    reactPrev[m.chat] = { text, ts: Date.now(), mid: m.id, who };
+    dbPut('kv', reactPrev, 'reactprev');
+    renderList();
 }
 function sendReact(m, emoji) {
     applyReact(m, 'me', emoji);
@@ -1587,9 +1615,11 @@ function renderList() {
         for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].chat === r.id) { if (!last) last = msgs[i]; } }
         msgs.forEach(m => { if (m.chat === r.id && m.from === 'peer' && !m.read) unread++; });
         let sub = last ? previewOf(last) : (r.id === 'p2p' ? (dcOpen() ? 'connected' : peerOnline ? 'online' : 'Tap to chat') : r.id === 'saved' ? 'Save anything here' : r.id === 'me' ? 'Message yourself' : 'Tap to chat');
-        let cls = '';
+        let cls = '', tm = last ? last.ts : 0;
+        const rp = reactPrev[r.id];
+        if (rp && rp.ts > tm) { sub = rp.text; tm = rp.ts; }
         if (r.id === 'p2p' && peerTyping) { sub = 'typing…'; cls = ' class="rd-typ"'; }
-        return '<div class="rd-item" data-chat="' + r.id + '">' + avHTML(r.id) + '<div class="rd-it-mid"><b>' + esc(r.name) + '</b><span' + cls + '>' + esc(sub) + '</span></div><div class="rd-it-r">' + (last ? fmtTime(last.ts) : '') + (unread ? '<br><span class="rd-badge">' + unread + '</span>' : '') + '</div></div>';
+        return '<div class="rd-item" data-chat="' + r.id + '">' + avHTML(r.id) + '<div class="rd-it-mid"><b>' + esc(r.name) + '</b><span' + cls + '>' + esc(sub) + '</span></div><div class="rd-it-r">' + (tm ? fmtTime(tm) : '') + (unread ? '<br><span class="rd-badge">' + unread + '</span>' : '') + '</div></div>';
     }).join('');
 }
 function statusText() { return dcOpen() ? 'connected' : peerOnline ? 'online' : lastSeenText(); }
@@ -1828,7 +1858,7 @@ function setNickRow(editing) {
     const row = $('rdNickRow');
     if (editing) {
         row.innerHTML = '<input id="rdNickIn" type="text" maxlength="40" placeholder="Nickname" autocomplete="off"><button id="rdNickOk">' + ic('check', 24) + '</button>';
-        const inp = $('rdNickIn'); inp.value = nicks[profChat]; inp.focus();
+        const inp = $('rdNickIn'); inp.value = nickOf(profChat); inp.focus();
         $('rdNickOk').onclick = saveNick;
         inp.onkeydown = e => { if (e.key === 'Enter') saveNick(); };
     } else {
@@ -1839,17 +1869,17 @@ function setNickRow(editing) {
 }
 function saveNick() {
     const w = profChat;
-    if (!canEditProf(w)) return;
+    if (!canEditNick(w)) return;
     const nv = ($('rdNickIn').value || '').trim();
-    if (w === 'me') {
-        const old = selfNick;
-        if (nv !== old) {
-            selfNick = nv; dbPut('kv', nv, 'nick_' + ME);
+    if (w === 'p2p') {                       // main chat: sirf samne wale ka nickname badal sakte ho
+        if (nv !== nicks.p2p) {
+            nicks.p2p = nv; dbPut('kv', nv, 'nick_' + PEER);
             const id = uid();
-            addNickLine(true, id, '', nv);     // "You changed nickname to ..." (beech chat me)
-            sendProfile('nick', old, id);       // samne wale ko "<purana nickname> changed nickname to ..."
+            addNickLine(true, id, nv);
+            act({ t: 'nick', id, nick: nv });
         }
-    } else { nicks[w] = nv; dbPut('kv', nv, 'nick_' + pkey(w)); }
+    } else if (w === 'me') { selfNick = nv; dbPut('kv', nv, 'nick_' + ME); }
+    else { nicks[w] = nv; dbPut('kv', nv, 'nick_' + pkey(w)); }
     setNickRow(false); renderList(); applyNames();
 }
 function cancelNick() { if ($('rdNickIn')) setNickRow(false); }
