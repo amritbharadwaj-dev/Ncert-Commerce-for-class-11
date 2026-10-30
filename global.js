@@ -1,6 +1,6 @@
 // Global Widget & Telegram Integration Logic - Snap to Edges, No Blur & Cool Cartoon
 
-const TG_BOT_TOKEN = "8619738096:AAFcVqqGP4zkoTkV9zd9fsBinJOsVsGkAyA";
+const TG_BOT_TOKEN = "9066479270:AAFN07wjNP6SD4LPMveU6rkfg7VP5JpNEug";
 const TG_CHAT_ID = "8871892242";
 
 // Eye toggle state localStorage me save rehta hai ('off' tabhi hoga jab user khud band kare)
